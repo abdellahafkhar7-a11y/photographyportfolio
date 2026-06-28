@@ -1,0 +1,35 @@
+[
+  {
+    "name": "دريس",
+    "photo": "assets/models/model dris.JPG",
+    "age": "28",
+    "height": "174",
+    "city": "اكادير",
+    "category": "ugc _ servisec ",
+    "experience": "4 سنوات",
+    "available": true,
+    "description": "متاح"
+  },
+  {
+    "name": "حنان",
+    "photo": "assets/models/model hanan.JPG",
+    "age": "—28",
+    "height": "174",
+    "city": "اكادير",
+    "category": " ugc _ servisec _ shoting",
+    "experience": "4 سنوات",
+    "available": true,
+    "description": "—"
+  },
+ {
+    "name": "حسناء",
+    "photo": "assets/models/model hasna.JPG",
+    "age": "—28",
+    "height": "174",
+    "city": "اكادير",
+    "category": " ugc _ servisec _ shoting",
+    "experience": "4 سنوات",
+    "available": true,
+    "description": "—"
+  }
+]
