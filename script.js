@@ -147,6 +147,9 @@ async function loadVideos(txtFile, containerId) {
       setTimeout(() => card.classList.remove("loading"), 5000);
     });
 
+    // Enhance newly added cards with overlays
+    enhanceReelCards();
+
   } catch (error) {
     console.error(error);
   }
@@ -665,7 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Add reveal to profile elements
-  const avatar = document.querySelector('.avatar');
+  const avatar = document.querySelector('.avatar-ring');
   const profileInfo = document.querySelector('.profile-info');
   const profileLine = document.querySelector('.profile-line');
   const bio = document.querySelector('.bio');
@@ -691,6 +694,18 @@ document.addEventListener('DOMContentLoaded', () => {
     bio.classList.add('reveal-fade');
     bio.classList.add('reveal-delay-2');
     revealObserver.observe(bio);
+  }
+
+  // Observe profile location
+  const profileLocation = document.querySelector('.profile-location');
+  if (profileLocation) {
+    revealObserver.observe(profileLocation);
+  }
+
+  // Observe profile actions
+  const profileActions = document.querySelector('.profile-actions');
+  if (profileActions) {
+    revealObserver.observe(profileActions);
   }
 
   // Add page transition class
@@ -720,7 +735,55 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
+
+  // Enhance video cards with overlays
+  enhanceReelCards();
 });
+
+// ============================================
+// VIDEO CARD OVERLAYS
+// ============================================
+var categoryLabels = {
+  ugc: 'UGC',
+  shoting: 'Shooting',
+  stores: 'Stores',
+  events: 'Events',
+  services: 'Services'
+};
+
+function enhanceReelCards() {
+  document.querySelectorAll('.reel-card').forEach(function(card) {
+    if (card.querySelector('.reel-overlay')) return;
+
+    var grid = card.closest('.video-grid');
+    var panel = grid ? grid.dataset.panel : '';
+    var label = categoryLabels[panel] || '';
+
+    var overlay = document.createElement('div');
+    overlay.className = 'reel-overlay';
+    overlay.innerHTML =
+      '<span class="reel-tag">' + label + '</span>' +
+      '<div class="reel-play-btn">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+      '</div>' +
+      '<div class="reel-gradient"></div>';
+
+    card.appendChild(overlay);
+
+    var video = card.querySelector('video');
+    if (video) {
+      video.addEventListener('play', function() {
+        card.classList.add('playing');
+      });
+      video.addEventListener('pause', function() {
+        card.classList.remove('playing');
+      });
+      video.addEventListener('ended', function() {
+        card.classList.remove('playing');
+      });
+    }
+  });
+}
 
 // ============================================
 // ANCHOR LINK NAVIGATION
@@ -859,3 +922,936 @@ window.addEventListener('resize', debounce(() => {
 if (window.performance && window.performance.mark) {
   window.performance.mark('animations-initialized');
 }
+
+// ============================================
+// VOICE OVER SECTION
+// ============================================
+
+(function() {
+  'use strict';
+
+  // DOM elements
+  const voGrid = document.getElementById('voiceover-grid');
+  const voEmpty = document.getElementById('voiceover-empty');
+  const voModal = document.getElementById('vo-modal');
+
+  if (!voModal) return;
+
+  // Modal elements
+  const voOverlay = voModal.querySelector('.vo-modal-overlay');
+  const voCloseBtn = voModal.querySelector('.vo-modal-close');
+  const voCoverImg = voModal.querySelector('.vo-cover');
+  const voTitle = voModal.querySelector('.vo-title');
+  const voCategory = voModal.querySelector('.vo-category');
+  const voDuration = voModal.querySelector('.vo-duration');
+  const voDesc = voModal.querySelector('.vo-description');
+  const voCanvas = document.getElementById('vo-waveform');
+  const voCtx = voCanvas.getContext('2d');
+  const voLoading = document.getElementById('vo-loading');
+  const voPlayPauseBtn = voModal.querySelector('.vo-play-pause');
+  const voPlayIcon = voModal.querySelector('.vo-icon-play');
+  const voPauseIcon = voModal.querySelector('.vo-icon-pause');
+  const voSkipBackBtn = voModal.querySelector('.vo-skip-back');
+  const voSkipFwdBtn = voModal.querySelector('.vo-skip-forward');
+  const voCurrentTime = voModal.querySelector('.vo-current-time');
+  const voTotalTime = voModal.querySelector('.vo-total-time');
+  const voVolumeSlider = voModal.querySelector('.vo-volume-slider');
+  const voSpeedBtn = voModal.querySelector('.vo-speed-btn');
+  const voSpeedMenu = voModal.querySelector('.vo-speed-menu');
+
+  // State
+  let audio = null;
+  let audioCtx = null;
+  let audioBlobUrl = null;
+  let waveformBars = [];
+  let rafId = null;
+  let lastFocused = null;
+  let isDragging = false;
+
+  // ============================================
+  // Helpers
+  // ============================================
+
+  function formatTime(sec) {
+    if (!sec || isNaN(sec) || !isFinite(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function showPlayIcon() {
+    voPlayIcon.style.display = '';
+    voPauseIcon.style.display = 'none';
+    voPlayPauseBtn.setAttribute('aria-label', 'Play');
+  }
+
+  function showPauseIcon() {
+    voPlayIcon.style.display = 'none';
+    voPauseIcon.style.display = '';
+    voPlayPauseBtn.setAttribute('aria-label', 'Pause');
+  }
+
+  function showLoading(show) {
+    voLoading.hidden = !show;
+  }
+
+  // Safari-compatible decode wrapper (callback-based API)
+  function decodeAudioData(ctx, buffer) {
+    return new Promise((resolve, reject) => {
+      try {
+        ctx.decodeAudioData(buffer, resolve, reject);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  // ============================================
+  // Card Creation
+  // ============================================
+
+  function createVoiceOverCard(item, index) {
+    const card = document.createElement('article');
+    card.className = 'vo-card reveal-scale';
+    card.style.transitionDelay = (Math.min(index, 5) * 0.1) + 's';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', 'Play voice over: ' + (item.title || ''));
+    card.dataset.audio = item.audio || '';
+    card.dataset.cover = item.cover || '';
+    card.dataset.title = item.title || '';
+    card.dataset.category = item.category || '';
+    card.dataset.description = item.description || '';
+    card.dataset.duration = item.duration || '';
+
+    card.innerHTML = `
+      <div class="vo-card-cover">
+        <img src="${item.cover || ''}" alt="${item.title || ''}" loading="lazy">
+        <div class="vo-card-overlay">
+          <span class="vo-card-play">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          </span>
+        </div>
+      </div>
+      <div class="vo-card-body">
+        <h3 class="vo-card-title">${item.title || ''}</h3>
+        <div class="vo-card-meta">
+          <span class="vo-card-category">${item.category || ''}</span>
+          <span class="vo-card-duration">${item.duration || ''}</span>
+        </div>
+        <p class="vo-card-desc">${item.description || ''}</p>
+      </div>
+    `;
+
+    card.addEventListener('click', () => openModal(card));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openModal(card);
+      }
+    });
+
+    return card;
+  }
+
+  // ============================================
+  // Load Voice Overs
+  // ============================================
+
+  async function loadVoiceOvers() {
+    if (!voGrid) return;
+
+    try {
+      const response = await fetch('data/voiceover.json');
+      const items = await response.json();
+
+      voGrid.innerHTML = '';
+
+      if (!items || items.length === 0) {
+        voGrid.hidden = true;
+        voEmpty.hidden = false;
+        if (typeof revealObserver !== 'undefined') {
+          revealObserver.observe(voEmpty);
+        } else {
+          voEmpty.classList.add('active');
+        }
+        return;
+      }
+
+      voEmpty.hidden = true;
+      voGrid.hidden = false;
+
+      items.forEach((item, index) => {
+        const card = createVoiceOverCard(item, index);
+        voGrid.appendChild(card);
+        if (typeof revealObserver !== 'undefined') {
+          revealObserver.observe(card);
+        }
+      });
+    } catch (err) {
+      console.error('Failed to load voice overs:', err);
+      voGrid.hidden = true;
+      voEmpty.hidden = false;
+      if (typeof revealObserver !== 'undefined') {
+        revealObserver.observe(voEmpty);
+      }
+    }
+  }
+
+  // ============================================
+  // Modal
+  // ============================================
+
+  function openModal(card) {
+    lastFocused = card;
+
+    // Set content
+    voCoverImg.src = card.dataset.cover || '';
+    voCoverImg.alt = card.dataset.title || '';
+    voTitle.textContent = card.dataset.title || '';
+    voCategory.textContent = card.dataset.category || '';
+    voDuration.textContent = card.dataset.duration || '';
+    voDesc.textContent = card.dataset.description || '';
+
+    // Reset player
+    showPlayIcon();
+    voCurrentTime.textContent = '0:00';
+    voTotalTime.textContent = card.dataset.duration || '0:00';
+    voVolumeSlider.value = 1;
+
+    // Clear waveform
+    waveformBars = [];
+    voCtx.clearRect(0, 0, voCanvas.width, voCanvas.height);
+
+    // Show modal
+    voModal.classList.add('active');
+    voModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+
+    // Load audio
+    loadAudio(card.dataset.audio);
+
+    // Focus play button
+    setTimeout(() => voPlayPauseBtn.focus(), 100);
+  }
+
+  function closeModal(restoreFocus) {
+    if (restoreFocus === undefined) restoreFocus = true;
+
+    voModal.classList.remove('active');
+    voModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+
+    // Stop audio
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+
+    // Cancel RAF
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+
+    // Revoke blob URL
+    if (audioBlobUrl) {
+      URL.revokeObjectURL(audioBlobUrl);
+      audioBlobUrl = null;
+    }
+
+    // Hide speed menu
+    voSpeedMenu.hidden = true;
+    voSpeedBtn.setAttribute('aria-expanded', 'false');
+
+    // Reset play icon
+    showPlayIcon();
+
+    // Restore focus
+    if (restoreFocus && lastFocused) {
+      lastFocused.focus();
+    }
+  }
+
+  // ============================================
+  // Audio Loading & Waveform
+  // ============================================
+
+  async function loadAudio(url) {
+    if (!url) {
+      console.error('No audio URL provided');
+      showLoading(false);
+      return;
+    }
+
+    showLoading(true);
+
+    try {
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+
+      // Create blob URL for audio element (Blob constructor copies data, does not detach)
+      if (audioBlobUrl) {
+        URL.revokeObjectURL(audioBlobUrl);
+      }
+      audioBlobUrl = URL.createObjectURL(new Blob([arrayBuffer]));
+
+      // Create audio element if needed
+      if (!audio) {
+        audio = new Audio();
+        audio.controlsList = 'nodownload';
+        audio.preload = 'auto';
+        audio.volume = 1;
+
+        audio.addEventListener('loadedmetadata', () => {
+          if (isFinite(audio.duration) && !isNaN(audio.duration)) {
+            voTotalTime.textContent = formatTime(audio.duration);
+          }
+        });
+
+        audio.addEventListener('ended', () => {
+          showPlayIcon();
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+          drawWaveform();
+        });
+
+        audio.addEventListener('canplay', () => {
+          showLoading(false);
+        });
+
+        audio.addEventListener('waiting', () => {
+          showLoading(true);
+        });
+
+        audio.addEventListener('playing', () => {
+          showLoading(false);
+        });
+
+        audio.addEventListener('error', () => {
+          showLoading(false);
+          console.error('Audio playback error');
+        });
+
+        // Prevent context menu (download)
+        audio.addEventListener('contextmenu', (e) => e.preventDefault());
+      }
+
+      audio.src = audioBlobUrl;
+
+      // Decode for waveform using Web Audio API
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        // slice(0) creates a copy since decodeAudioData may detach the buffer
+        const audioBuffer = await decodeAudioData(audioCtx, arrayBuffer.slice(0));
+        generateWaveform(audioBuffer);
+      } catch (decodeErr) {
+        console.warn('Waveform decode failed, using fallback:', decodeErr);
+        generatePseudoWaveform();
+      }
+
+    } catch (err) {
+      console.error('Failed to load audio:', err);
+      showLoading(false);
+    }
+  }
+
+  function generateWaveform(audioBuffer) {
+    const channelData = audioBuffer.getChannelData(0);
+    const samples = 180;
+    const blockSize = Math.floor(channelData.length / samples);
+    const bars = [];
+
+    for (let i = 0; i < samples; i++) {
+      let sum = 0;
+      let count = 0;
+      for (let j = 0; j < blockSize; j++) {
+        const idx = i * blockSize + j;
+        if (idx < channelData.length) {
+          sum += Math.abs(channelData[idx]);
+          count++;
+        }
+      }
+      bars.push(count > 0 ? sum / count : 0);
+    }
+
+    // Normalize
+    let max = 0;
+    for (let k = 0; k < bars.length; k++) {
+      if (bars[k] > max) max = bars[k];
+    }
+
+    waveformBars = max > 0
+      ? bars.map(v => v / max)
+      : bars.map(() => 0.5);
+
+    drawWaveform();
+  }
+
+  function generatePseudoWaveform() {
+    const samples = 180;
+    waveformBars = [];
+    for (let i = 0; i < samples; i++) {
+      const val = 0.3 + 0.3 * Math.sin(i * 0.1) + 0.2 * Math.sin(i * 0.3) + 0.1 * Math.random();
+      waveformBars.push(Math.max(0.1, Math.min(1, val)));
+    }
+    drawWaveform();
+  }
+
+  function drawWaveform() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = voCanvas.getBoundingClientRect();
+
+    if (rect.width === 0) return;
+
+    voCanvas.width = rect.width * dpr;
+    voCanvas.height = rect.height * dpr;
+    voCtx.setTransform(1, 0, 0, 1, 0, 0);
+    voCtx.scale(dpr, dpr);
+
+    const width = rect.width;
+    const height = rect.height;
+    const barCount = waveformBars.length;
+
+    if (barCount === 0) return;
+
+    const barWidth = width / barCount;
+    const progress = (audio && audio.duration && isFinite(audio.duration))
+      ? audio.currentTime / audio.duration
+      : 0;
+
+    voCtx.clearRect(0, 0, width, height);
+
+    for (let i = 0; i < barCount; i++) {
+      const barHeight = Math.max(2, waveformBars[i] * height * 0.9);
+      const x = i * barWidth;
+      const y = (height - barHeight) / 2;
+
+      if (i / barCount <= progress) {
+        voCtx.fillStyle = '#2F6BFF';
+      } else {
+        voCtx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+      }
+
+      voCtx.fillRect(x, y, Math.max(1, barWidth - 1), barHeight);
+    }
+  }
+
+  // ============================================
+  // Player Controls
+  // ============================================
+
+  function togglePlay() {
+    if (!audio || !audio.src) return;
+
+    if (audio.paused) {
+      audio.play().then(() => {
+        showPauseIcon();
+        startProgressLoop();
+      }).catch(err => {
+        console.error('Play failed:', err);
+      });
+    } else {
+      audio.pause();
+      showPlayIcon();
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+  }
+
+  function startProgressLoop() {
+    if (rafId) cancelAnimationFrame(rafId);
+
+    function loop() {
+      if (audio && !audio.paused) {
+        drawWaveform();
+        voCurrentTime.textContent = formatTime(audio.currentTime);
+        rafId = requestAnimationFrame(loop);
+      }
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function seekToPosition(clientX) {
+    if (!audio || !audio.duration || !isFinite(audio.duration)) return;
+
+    const rect = voCanvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, x / rect.width));
+    audio.currentTime = ratio * audio.duration;
+
+    drawWaveform();
+    voCurrentTime.textContent = formatTime(audio.currentTime);
+    voCanvas.setAttribute('aria-valuenow', Math.round(ratio * 100));
+  }
+
+  function skip(seconds) {
+    if (!audio) return;
+    const newTime = Math.max(0, Math.min(audio.duration || 0, audio.currentTime + seconds));
+    audio.currentTime = newTime;
+    drawWaveform();
+    voCurrentTime.textContent = formatTime(newTime);
+  }
+
+  function setVolume(value) {
+    if (audio) audio.volume = parseFloat(value);
+  }
+
+  function setSpeed(speed) {
+    if (audio) audio.playbackRate = parseFloat(speed);
+    voSpeedBtn.textContent = speed + 'x';
+    voSpeedMenu.querySelectorAll('button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.speed === speed);
+    });
+  }
+
+  // ============================================
+  // Focus Trap
+  // ============================================
+
+  function getFocusableElements() {
+    return Array.prototype.slice.call(voModal.querySelectorAll(
+      'button:not([hidden]):not([disabled]), input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(el => el.offsetParent !== null);
+  }
+
+  function trapFocus(e) {
+    if (e.key !== 'Tab') return;
+
+    const focusable = getFocusableElements();
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  // ============================================
+  // Event Listeners
+  // ============================================
+
+  // Play/Pause
+  voPlayPauseBtn.addEventListener('click', togglePlay);
+
+  // Skip buttons
+  voSkipBackBtn.addEventListener('click', () => skip(-10));
+  voSkipFwdBtn.addEventListener('click', () => skip(10));
+
+  // Volume
+  voVolumeSlider.addEventListener('input', (e) => setVolume(e.target.value));
+
+  // Speed control
+  voSpeedBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isExpanded = voSpeedBtn.getAttribute('aria-expanded') === 'true';
+    voSpeedMenu.hidden = isExpanded;
+    voSpeedBtn.setAttribute('aria-expanded', String(!isExpanded));
+  });
+
+  voSpeedMenu.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setSpeed(btn.dataset.speed);
+      voSpeedMenu.hidden = true;
+      voSpeedBtn.setAttribute('aria-expanded', 'false');
+      voSpeedBtn.focus();
+    });
+  });
+
+  // Close speed menu on outside click
+  document.addEventListener('click', (e) => {
+    if (!voSpeedMenu.hidden && !voSpeedBtn.contains(e.target) && !voSpeedMenu.contains(e.target)) {
+      voSpeedMenu.hidden = true;
+      voSpeedBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Modal close
+  voCloseBtn.addEventListener('click', () => closeModal(true));
+  voOverlay.addEventListener('click', () => closeModal(true));
+
+  // Waveform interaction (mouse)
+  voCanvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    seekToPosition(e.clientX);
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (isDragging) seekToPosition(e.clientX);
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  // Waveform interaction (touch)
+  voCanvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 0) {
+      seekToPosition(e.touches[0].clientX);
+    }
+  }, { passive: true });
+
+  voCanvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 0) {
+      e.preventDefault();
+      seekToPosition(e.touches[0].clientX);
+    }
+  }, { passive: false });
+
+  // Keyboard support
+  voModal.addEventListener('keydown', (e) => {
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault();
+        closeModal(true);
+        break;
+      case ' ':
+        if (document.activeElement !== voVolumeSlider) {
+          e.preventDefault();
+          togglePlay();
+        }
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        skip(-10);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        skip(10);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (audio) {
+          audio.volume = Math.min(1, audio.volume + 0.1);
+          voVolumeSlider.value = audio.volume;
+        }
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        if (audio) {
+          audio.volume = Math.max(0, audio.volume - 0.1);
+          voVolumeSlider.value = audio.volume;
+        }
+        break;
+      case 'Tab':
+        trapFocus(e);
+        break;
+    }
+  });
+
+  // Redraw waveform on resize
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (voModal.classList.contains('active')) {
+        drawWaveform();
+      }
+    }, 250);
+  });
+
+  // Stop audio when navigating away via [data-nav]
+  document.addEventListener('click', (e) => {
+    const navItem = e.target.closest('[data-nav]');
+    if (navItem && navItem.dataset.nav !== 'voiceover') {
+      if (voModal.classList.contains('active')) {
+        closeModal(false);
+      } else if (audio) {
+        audio.pause();
+        showPlayIcon();
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+    }
+  }, true); // capture phase — runs before existing nav handlers
+
+  // Pause audio when tab is hidden (battery / performance)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && audio && !audio.paused) {
+      audio.pause();
+      showPlayIcon();
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+  });
+
+  // Initialize
+  document.addEventListener('DOMContentLoaded', loadVoiceOvers);
+
+})();
+
+// ============================================
+// CINEMATIC FULLSCREEN VIEWER
+// ============================================
+
+(function() {
+  'use strict';
+
+  var viewer = document.getElementById('cinematic-viewer');
+  if (!viewer) return;
+
+  var backdrop = viewer.querySelector('.cv-backdrop');
+  var closeBtn = viewer.querySelector('.cv-close');
+  var prevBtn = viewer.querySelector('.cv-prev');
+  var nextBtn = viewer.querySelector('.cv-next');
+  var videoEl = viewer.querySelector('video');
+  var tagEl = viewer.querySelector('.cv-tag');
+  var titleEl = viewer.querySelector('.cv-title');
+  var durationEl = viewer.querySelector('.cv-duration');
+
+  var videoList = [];
+  var currentIndex = 0;
+  var lastFocused = null;
+  var touchStartX = 0;
+
+  function collectVideos() {
+    videoList = [];
+    document.querySelectorAll('.reel-card').forEach(function(card) {
+      var video = card.querySelector('video source');
+      if (video && video.src) {
+        var grid = card.closest('.video-grid');
+        var panel = grid ? grid.dataset.panel : '';
+        videoList.push({
+          src: video.src,
+          category: categoryLabels[panel] || '',
+          title: panel ? (panel.charAt(0).toUpperCase() + panel.slice(1)) : 'Project',
+          card: card
+        });
+      }
+    });
+  }
+
+  function openViewer(card) {
+    collectVideos();
+    if (videoList.length === 0) return;
+
+    // Find the index of the clicked card
+    var found = videoList.findIndex(function(item) { return item.card === card; });
+    currentIndex = found >= 0 ? found : 0;
+
+    lastFocused = card;
+    loadVideo(currentIndex);
+    viewer.classList.add('active');
+    viewer.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    document.body.style.overflow = 'hidden';
+
+    setTimeout(function() { videoEl.play().catch(function(){}); }, 300);
+  }
+
+  function loadVideo(index) {
+    if (index < 0) index = videoList.length - 1;
+    if (index >= videoList.length) index = 0;
+
+    currentIndex = index;
+    var item = videoList[index];
+
+    videoEl.src = item.src;
+    tagEl.textContent = item.category;
+    titleEl.textContent = item.title;
+    durationEl.textContent = '';
+
+    videoEl.addEventListener('loadedmetadata', function setDur() {
+      var m = Math.floor(videoEl.duration / 60);
+      var s = Math.floor(videoEl.duration % 60);
+      durationEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+      videoEl.removeEventListener('loadedmetadata', setDur);
+    });
+  }
+
+  function closeViewer() {
+    viewer.classList.remove('active');
+    viewer.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    videoEl.pause();
+    videoEl.removeAttribute('src');
+    videoEl.load();
+
+    if (lastFocused) lastFocused.focus();
+  }
+
+  function next() {
+    loadVideo(currentIndex + 1);
+    setTimeout(function() { videoEl.play().catch(function(){}); }, 200);
+  }
+
+  function prev() {
+    loadVideo(currentIndex - 1);
+    setTimeout(function() { videoEl.play().catch(function(){}); }, 200);
+  }
+
+  // Close
+  closeBtn.addEventListener('click', closeViewer);
+  backdrop.addEventListener('click', closeViewer);
+
+  // Navigation
+  prevBtn.addEventListener('click', prev);
+  nextBtn.addEventListener('click', next);
+
+  // Keyboard
+  viewer.addEventListener('keydown', function(e) {
+    switch (e.key) {
+      case 'Escape': e.preventDefault(); closeViewer(); break;
+      case 'ArrowLeft': e.preventDefault(); prev(); break;
+      case 'ArrowRight': e.preventDefault(); next(); break;
+    }
+  });
+
+  // Touch swipe
+  viewer.addEventListener('touchstart', function(e) {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+
+  viewer.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 60) {
+      if (dx > 0) prev(); else next();
+    }
+  }, { passive: true });
+
+  // Wire up card clicks — but NOT when clicking the native video controls
+  document.addEventListener('click', function(e) {
+    var card = e.target.closest('.reel-card');
+    if (!card) return;
+    // If the click is on the video element itself (controls), don't open viewer
+    if (e.target.tagName === 'VIDEO') return;
+
+    // Only open viewer for cards in the currently active panel
+    var grid = card.closest('.video-grid');
+    if (grid && grid.classList.contains('active')) {
+      e.preventDefault();
+      openViewer(card);
+    }
+  });
+
+  // Stop viewer audio when navigating away
+  document.addEventListener('click', function(e) {
+    var navItem = e.target.closest('[data-nav]');
+    if (navItem && viewer.classList.contains('active')) {
+      closeViewer();
+    }
+  }, true);
+
+})();
+
+// ============================================
+// SLIDING TAB INDICATOR
+// ============================================
+
+(function() {
+  'use strict';
+
+  var indicator = document.getElementById('tab-indicator');
+  if (!indicator) return;
+
+  var tabContainer = document.querySelector('.category-cards');
+  var allTabs = document.querySelectorAll('.highlight-tab');
+
+  function moveIndicator(tab) {
+    if (!tab || !tabContainer) return;
+    var tabRect = tab.getBoundingClientRect();
+    var containerRect = tabContainer.getBoundingClientRect();
+
+    indicator.style.width = tabRect.width + 'px';
+    indicator.style.left = (tabRect.left - containerRect.left) + 'px';
+    indicator.classList.add('active');
+  }
+
+  // Move on tab click
+  allTabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      moveIndicator(tab);
+    });
+  });
+
+  // Set initial position
+  function initIndicator() {
+    var active = document.querySelector('.highlight-tab.active');
+    if (active) moveIndicator(active);
+  }
+
+  // Initialize after layout settles
+  setTimeout(initIndicator, 100);
+  window.addEventListener('resize', function() {
+    setTimeout(initIndicator, 50);
+  });
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initIndicator, 100);
+  });
+})();
+
+// ============================================
+// CATEGORY PAGE VIDEO CLONER
+// ============================================
+
+(function() {
+  'use strict';
+
+  var categories = [
+    { panel: 'ugc', grid: 'grid-cat-ugc' },
+    { panel: 'shoting', grid: 'grid-cat-shoting' },
+    { panel: 'stores', grid: 'grid-cat-stores' },
+    { panel: 'events', grid: 'grid-cat-events' },
+    { panel: 'services', grid: 'grid-cat-services' }
+  ];
+
+  function cloneVideos() {
+    categories.forEach(function(cat) {
+      var source = document.querySelector('.video-grid[data-panel="' + cat.panel + '"]');
+      var target = document.getElementById(cat.grid);
+      if (!source || !target) return;
+
+      target.innerHTML = '';
+      var cards = source.querySelectorAll('.reel-card');
+      cards.forEach(function(card) {
+        var clone = card.cloneNode(true);
+        target.appendChild(clone);
+
+        // Re-init loading handlers for cloned videos
+        var video = clone.querySelector('video');
+        if (video) {
+          video.addEventListener('loadstart', function() { clone.classList.add('loading'); });
+          video.addEventListener('loadedmetadata', function() { clone.classList.remove('loading'); });
+          video.addEventListener('loadeddata', function() { clone.classList.remove('loading'); });
+          video.addEventListener('canplay', function() { clone.classList.remove('loading'); });
+          video.addEventListener('waiting', function() { clone.classList.add('loading'); });
+          video.addEventListener('playing', function() { clone.classList.remove('loading'); });
+          setTimeout(function() { clone.classList.remove('loading'); }, 5000);
+        }
+      });
+
+      // Enhance cloned cards with overlays
+      if (typeof enhanceReelCards === 'function') {
+        enhanceReelCards();
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', cloneVideos);
+  } else {
+    cloneVideos();
+  }
+})();
