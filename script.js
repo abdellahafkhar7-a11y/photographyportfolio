@@ -82,79 +82,6 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-async function loadVideos(txtFile, containerId) {
-  try {
-    const response = await fetch(txtFile);
-    const text = await response.text();
-
-    const links = text
-      .split("\n")
-      .map(link => link.trim())
-      .filter(link => link);
-
-    const container = document.getElementById(containerId);
-
-    if (!container) return;
-
-    container.innerHTML = "";
-
-    links.forEach((link) => {
-      const card = document.createElement("article");
-      card.className = "reel-card loading";
-      
-      card.innerHTML = `
-        <video
-          controls
-          preload="metadata"
-          playsinline
-          controlsList="nodownload noplaybackrate"
-          disablePictureInPicture
-        >
-          <source src="${link}" type="video/mp4">
-        </video>
-      `;
-      
-      container.appendChild(card);
-
-      const video = card.querySelector("video");
-
-      // Add loading state
-      video.addEventListener("loadstart", () => {
-        card.classList.add("loading");
-      });
-
-      video.addEventListener("loadedmetadata", () => {
-        card.classList.remove("loading");
-      });
-
-      video.addEventListener("loadeddata", () => {
-        card.classList.remove("loading");
-      });
-
-      video.addEventListener("canplay", () => {
-        card.classList.remove("loading");
-      });
-
-      video.addEventListener("waiting", () => {
-        card.classList.add("loading");
-      });
-
-      video.addEventListener("playing", () => {
-        card.classList.remove("loading");
-      });
-
-      // Fallback: remove loading state after 5s in case events don't fire (iOS)
-      setTimeout(() => card.classList.remove("loading"), 5000);
-    });
-
-    // Enhance newly added cards with overlays
-    enhanceReelCards();
-
-  } catch (error) {
-    console.error(error);
-  }
-}
-
 
 
 // Initialize existing videos with premium styling
@@ -411,6 +338,21 @@ function showPage(pageName, scrollTarget) {
         revealObserver.observe(el);
       }
     });
+
+    // Force-activate reveal elements already in viewport — the
+    // IntersectionObserver callback is async and may not fire promptly
+    // when a page-view was just switched from display:none to block
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        var vh = window.innerHeight || document.documentElement.clientHeight;
+        revealContainer.querySelectorAll('.reveal:not(.active), .reveal-fade:not(.active), .reveal-scale:not(.active)').forEach(el => {
+          var rect = el.getBoundingClientRect();
+          if (rect.top < vh && rect.bottom > 0) {
+            el.classList.add('active');
+          }
+        });
+      });
+    });
   }
 }
 
@@ -631,7 +573,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const profileCard = document.querySelector('.profile-card');
   const portfolioShell = document.querySelector('.portfolio-shell');
   const footer = document.querySelector('.footer');
-  const highlightTabs = document.querySelectorAll('.highlight-tab');
   const reelCards = document.querySelectorAll('.reel-card');
 
   if (profileCard) {
@@ -650,13 +591,6 @@ document.addEventListener('DOMContentLoaded', () => {
     footer.classList.add('reveal-delay-3');
     revealObserver.observe(footer);
   }
-
-  // Stagger category tabs
-  highlightTabs.forEach((tab, index) => {
-    tab.classList.add('reveal-fade');
-    tab.classList.add(`reveal-delay-${index + 1}`);
-    revealObserver.observe(tab);
-  });
 
   // Stagger reel cards with reveal-scale
   reelCards.forEach((card, index) => {
@@ -1757,52 +1691,6 @@ if (window.performance && window.performance.mark) {
 })();
 
 // ============================================
-// SLIDING TAB INDICATOR
-// ============================================
-
-(function() {
-  'use strict';
-
-  var indicator = document.getElementById('tab-indicator');
-  if (!indicator) return;
-
-  var tabContainer = document.querySelector('.category-cards');
-  var allTabs = document.querySelectorAll('.highlight-tab');
-
-  function moveIndicator(tab) {
-    if (!tab || !tabContainer) return;
-    var tabRect = tab.getBoundingClientRect();
-    var containerRect = tabContainer.getBoundingClientRect();
-
-    indicator.style.width = tabRect.width + 'px';
-    indicator.style.left = (tabRect.left - containerRect.left) + 'px';
-    indicator.classList.add('active');
-  }
-
-  // Move on tab click
-  allTabs.forEach(function(tab) {
-    tab.addEventListener('click', function() {
-      moveIndicator(tab);
-    });
-  });
-
-  // Set initial position
-  function initIndicator() {
-    var active = document.querySelector('.highlight-tab.active');
-    if (active) moveIndicator(active);
-  }
-
-  // Initialize after layout settles
-  setTimeout(initIndicator, 100);
-  window.addEventListener('resize', function() {
-    setTimeout(initIndicator, 50);
-  });
-  document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(initIndicator, 100);
-  });
-})();
-
-// ============================================
 // CATEGORY PAGE VIDEO CLONER
 // ============================================
 
@@ -1827,17 +1715,27 @@ if (window.performance && window.performance.mark) {
       var cards = source.querySelectorAll('.reel-card');
       cards.forEach(function(card) {
         var clone = card.cloneNode(true);
+        // Remove reveal animation classes from clones — they cause opacity:0
+        // that the IntersectionObserver may not clear on hidden pages
+        clone.classList.remove('reveal-scale', 'reveal-delay-1', 'reveal-delay-2', 'reveal-delay-3', 'reveal-delay-4', 'reveal-delay-5');
         target.appendChild(clone);
 
         // Re-init loading handlers for cloned videos
         var video = clone.querySelector('video');
         if (video) {
-          video.addEventListener('loadstart', function() { clone.classList.add('loading'); });
+          video.addEventListener('loadstart', function() {
+            clone.classList.add('loading');
+            // Fresh fallback from actual load start, not from clone time
+            setTimeout(function() { clone.classList.remove('loading'); }, 5000);
+          });
           video.addEventListener('loadedmetadata', function() { clone.classList.remove('loading'); });
           video.addEventListener('loadeddata', function() { clone.classList.remove('loading'); });
           video.addEventListener('canplay', function() { clone.classList.remove('loading'); });
           video.addEventListener('waiting', function() { clone.classList.add('loading'); });
           video.addEventListener('playing', function() { clone.classList.remove('loading'); });
+          // Explicitly trigger loading — cloned videos in display:none
+          // containers don't auto-load their <source> elements
+          video.load();
           setTimeout(function() { clone.classList.remove('loading'); }, 5000);
         }
       });

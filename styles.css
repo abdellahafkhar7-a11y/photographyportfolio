@@ -313,6 +313,7 @@ a:focus-visible {
 .reveal.active {
   opacity: 1;
   transform: translateY(0);
+  will-change: auto;
 }
 
 .reveal-fade {
@@ -323,6 +324,7 @@ a:focus-visible {
 
 .reveal-fade.active {
   opacity: 1;
+  will-change: auto;
 }
 
 .reveal-scale {
@@ -337,6 +339,7 @@ a:focus-visible {
 .reveal-scale.active {
   opacity: 1;
   transform: scale(1);
+  will-change: auto;
 }
 
 /* ============================================
@@ -371,6 +374,12 @@ a:focus-visible {
 .page {
   width: min(var(--content-max), calc(100% - var(--space-8)));
   margin: var(--space-6) auto var(--space-11);
+}
+
+section[id],
+main[id],
+footer[id] {
+  scroll-margin-top: 100px;
 }
 
 .profile-card {
@@ -505,16 +514,6 @@ a:focus-visible {
   flex-wrap: wrap;
 }
 
-.username {
-  margin: 0 0 var(--space-2);
-  direction: ltr;
-  color: var(--accent-primary);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .bio {
   max-width: 700px;
   margin-bottom: var(--space-5);
@@ -618,64 +617,6 @@ a:focus-visible {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
   box-shadow: var(--shadow-lg);
-}
-
-/* Profile Stats - Luxury Cards */
-.profile-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-3);
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--glass-shadow);
-  transition: all var(--transition-smooth);
-  text-align: center;
-}
-
-.stat-item:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-xl);
-  border-color: var(--accent-light);
-}
-
-.stat-icon {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  background: linear-gradient(135deg, rgba(108, 77, 255, 0.12), rgba(79, 125, 255, 0.06));
-  border-radius: var(--radius-md);
-  color: var(--accent-primary);
-}
-
-.stat-number {
-  font-size: var(--text-2xl);
-  font-weight: var(--weight-black);
-  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.1;
-}
-
-.stat-label {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 /* ============================================
@@ -921,6 +862,7 @@ a:focus-visible {
   box-shadow: var(--shadow-lg);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  contain: layout paint;
 }
 
 /* Premium Hover Animation */
@@ -939,7 +881,7 @@ a:focus-visible {
 .reel-card video {
   width: 100%;
   aspect-ratio: 9 / 16;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   position: relative;
   z-index: 1;
@@ -969,7 +911,7 @@ a:focus-visible {
   background-size: 200% 100%;
   animation: shimmer 2s ease-in-out infinite;
   z-index: 5;
-  border-radius: 24px;
+  border-radius: inherit;
   will-change: background-position;
 }
 
@@ -981,7 +923,7 @@ a:focus-visible {
   right: 0;
   bottom: 0;
   background: var(--bg-tertiary);
-  border-radius: 24px;
+  border-radius: inherit;
   z-index: 0;
 }
 
@@ -1173,6 +1115,7 @@ a:focus-visible {
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   transition: all var(--transition-smooth);
+  contain: layout paint;
 }
 
 .model-card:hover {
@@ -1307,6 +1250,7 @@ a:focus-visible {
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   transition: all var(--transition-smooth);
+  contain: layout paint;
 }
 
 .buyer-card:hover {
@@ -1416,6 +1360,7 @@ a:focus-visible {
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   transition: all var(--transition-smooth);
+  contain: layout paint;
 }
 
 .equipment-card:hover {
@@ -1461,102 +1406,6 @@ a:focus-visible {
   color: var(--text-secondary);
   line-height: var(--leading-relaxed);
   margin: 0;
-}
-
-/* ============================================
-    SERVICES SHOWCASE - CIRCULAR HIGHLIGHTS
-    ============================================ */
-.services-section {
-  width: min(var(--content-max), calc(100% - var(--space-8)));
-  margin: var(--space-8) auto;
-  padding: var(--space-4) 0;
-}
-
-.services-heading {
-  font-size: clamp(1.75rem, 4vw, 2.5rem);
-  font-weight: var(--weight-black);
-  text-align: center;
-  margin-bottom: var(--space-8);
-  background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.services-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-5);
-}
-
-.service-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  text-decoration: none;
-  color: var(--text-primary);
-  font-weight: var(--weight-bold);
-  font-size: var(--text-xs);
-  transition: all var(--transition-smooth);
-  text-align: center;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  position: relative;
-}
-
-.service-card::before {
-  display: none;
-}
-
-.service-card:hover,
-.service-card:focus-visible {
-  transform: translateY(-4px);
-  color: var(--accent-primary);
-}
-
-.service-card:active {
-  transform: translateY(-2px);
-  transition: transform var(--transition-fast);
-}
-
-.service-icon {
-  display: grid;
-  width: 64px;
-  height: 64px;
-  place-items: center;
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 2px solid var(--glass-border);
-  border-radius: 50%;
-  color: var(--accent-primary);
-  transition: all var(--transition-bounce);
-  box-shadow: var(--glass-shadow);
-  position: relative;
-}
-
-.service-card:hover .service-icon,
-.service-card:focus-visible .service-icon {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  border-color: var(--accent-primary);
-  color: #fff;
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(108, 77, 255, 0.4);
-}
-
-.service-name {
-  line-height: var(--leading-snug);
-  max-width: 80px;
-}
-
-/* GPU Acceleration */
-.service-card {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
 }
 
 /* ============================================
@@ -2630,6 +2479,12 @@ a:focus-visible {
   .bottom-nav {
     bottom: var(--space-4);
   }
+
+  .btn-action {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-xs);
+  }
 }
 
 /* Mobile Phones - Enhanced */
@@ -2723,7 +2578,6 @@ a:focus-visible {
 
   .service-circle-label {
     font-size: 10px;
-  }
   }
 
   /* Homepage: keep 3 columns on mobile */
@@ -3138,156 +2992,15 @@ a:focus-visible {
 }
 
 /* ============================================
-    PROFILE STATS & SERVICES RESPONSIVE
-    ============================================ */
-
-@media (max-width: 1024px) {
-  .profile-stats {
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-3);
-  }
-
-  .services-grid {
-    gap: var(--space-4);
-  }
-}
-
-@media (max-width: 768px) {
-  .profile-stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-3);
-  }
-
-  .stat-number {
-    font-size: var(--text-xl);
-  }
-
-  .stat-icon {
-    width: 32px;
-    height: 32px;
-  }
-
-  .btn-action {
-    min-height: 44px;
-    padding: var(--space-2) var(--space-3);
-    font-size: var(--text-xs);
-  }
-
-  .service-icon {
-    width: 52px;
-    height: 52px;
-  }
-}
-
-@media (max-width: 540px) {
-  .profile-stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-2);
-  }
-
-  .stat-item {
-    padding: var(--space-3) var(--space-2);
-  }
-
-  .stat-number {
-    font-size: var(--text-lg);
-  }
-
-  .stat-label {
-    font-size: 10px;
-  }
-
-  .stat-icon {
-    width: 28px;
-    height: 28px;
-  }
-
-  .services-section {
-    width: calc(100% - var(--space-4));
-    margin: var(--space-5) auto;
-  }
-
-  .services-heading {
-    font-size: clamp(1.5rem, 5vw, 2rem);
-    margin-bottom: var(--space-5);
-  }
-
-  .services-grid {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
-    justify-content: flex-start;
-    padding-bottom: var(--space-2);
-  }
-
-  .services-grid::-webkit-scrollbar {
-    display: none;
-  }
-
-  .service-card {
-    flex: 0 0 auto;
-    scroll-snap-align: center;
-  }
-
-  .service-icon {
-    width: 48px;
-    height: 48px;
-  }
-
-  .service-icon svg {
-    width: 22px;
-    height: 22px;
-  }
-
-  .service-name {
-    font-size: 10px;
-  }
-}
-
-@media (max-width: 380px) {
-  .profile-stats {
-    gap: var(--space-2);
-  }
-
-  .stat-item {
-    padding: var(--space-2) var(--space-1);
-  }
-
-  .services-grid {
-    gap: var(--space-3);
-  }
-
-  .service-icon {
-    width: 44px;
-    height: 44px;
-  }
-
-  .service-icon svg {
-    width: 20px;
-    height: 20px;
-  }
-}
-
-/* Print */
-@media print {
-  .services-section {
-    display: none;
-  }
-}
-
-/* ============================================
     PRINT STYLES
     ============================================ */
 @media print {
   .floating-nav,
   .image-modal,
   .bottom-nav,
-  .menu-panel {
+  .menu-panel,
+  .cinematic-viewer,
+  .vo-modal {
     display: none !important;
   }
 
@@ -3424,7 +3137,9 @@ a:focus-visible {
 
 .cv-video-wrapper video {
   width: 100%;
+  height: auto;
   max-height: 80vh;
+  object-fit: contain;
   display: block;
   border-radius: var(--radius-2xl);
 }
@@ -3496,12 +3211,6 @@ a:focus-visible {
   }
 }
 
-@media print {
-  .cinematic-viewer {
-    display: none !important;
-  }
-}
-
 /* ============================================
     VOICE OVER SECTION - PREMIUM CARDS & PLAYER
     ============================================ */
@@ -3550,6 +3259,7 @@ a:focus-visible {
   transition: all var(--transition-smooth);
   cursor: pointer;
   outline: none;
+  contain: layout paint;
 }
 
 .vo-card:hover,
@@ -4243,12 +3953,5 @@ a:focus-visible {
     right: 50%;
     transform: translateX(50%);
     transform-origin: bottom center;
-  }
-}
-
-/* Print */
-@media print {
-  .vo-modal {
-    display: none !important;
   }
 }
