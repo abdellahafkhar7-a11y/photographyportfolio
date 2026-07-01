@@ -53,6 +53,18 @@
     "experience": " ",
     "available": true,
     "description": "—"
+  },
+     {
+    "name": "خولود",
+    "photo": "assets/models/kholoud.jpeg",
+    "age": "",
+    "height": "",
+    "city": "اكادير",
+    "category": "ugc _ servisec _ shoting ",
+    "experience": " ",
+    "available": true,
+    "description": "—"
   }
+  
   
 ]
