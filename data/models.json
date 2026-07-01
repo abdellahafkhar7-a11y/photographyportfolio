@@ -31,5 +31,28 @@
     "experience": " ",
     "available": true,
     "description": "—"
+  },
+   {
+    "name": "مريم",
+    "photo": "assets/models/maryam hawara.PNG",
+    "age": "",
+    "height": "",
+    "city": "اكادير",
+    "category": "ugc _ servisec _ shoting ",
+    "experience": " ",
+    "available": true,
+    "description": "—"
+  },
+     {
+    "name": "يوسف",
+    "photo": "assets/models/yousef.PNG",
+    "age": "",
+    "height": "",
+    "city": "اكادير",
+    "category": "ugc _ servisec _ shoting ",
+    "experience": " ",
+    "available": true,
+    "description": "—"
   }
+  
 ]

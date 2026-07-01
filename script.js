@@ -1,286 +1,843 @@
-// Prevent browser from restoring scroll position on page reload
+// ============================================
+// SCROLL RESTORATION
+// Prevent browser from restoring scroll position on reload
+// ============================================
 if ('scrollRestoration' in history) {
   history.scrollRestoration = 'manual';
 }
 
-const tabs = document.querySelectorAll(".tab");
-const panels = document.querySelectorAll(".video-grid");
-const year = document.querySelector("#year");
-const mediaOpeners = document.querySelectorAll("[data-lightbox-src]");
-const imageModal = document.querySelector("#image-modal");
-const modalImage = imageModal ? imageModal.querySelector("img") : null;
-const modalClose = imageModal ? imageModal.querySelector(".modal-close") : null;
-const navToggle = document.querySelector("#nav-toggle");
-const navMenu = document.querySelector("#nav-menu");
-const navLinks = document.querySelectorAll(".nav-link");
+// ============================================
+// DOM REFERENCES
+// ============================================
+const year = document.querySelector('#year');
+const mediaOpeners = document.querySelectorAll('[data-lightbox-src]');
+const imageModal = document.querySelector('#image-modal');
+const modalImage = imageModal ? imageModal.querySelector('img') : null;
+const modalClose = imageModal ? imageModal.querySelector('.modal-close') : null;
+const navToggle = document.querySelector('#nav-toggle');
+const navMenu = document.querySelector('#nav-menu');
+const navLinks = document.querySelectorAll('.nav-link');
+const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
+const menuBtn = document.querySelector('#menu-btn');
+const menuPanel = document.querySelector('#menu-panel');
+const menuClose = document.querySelector('#menu-close');
+const menuItems = document.querySelectorAll('.menu-item');
+const pageViews = document.querySelectorAll('.page-view');
+let navItems = Array.from(document.querySelectorAll('[data-nav]'));
 
+// ============================================
+// UTILITIES
+// ============================================
+function throttle(func, limit) {
+  let inThrottle;
+  return function() {
+    const args = arguments;
+    const context = this;
+    if (!inThrottle) {
+      func.apply(context, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+function pauseAllVideos() {
+  document.querySelectorAll('video').forEach(video => video.pause());
+}
+
+// Attach loading-state event handlers to a reel card's video element
+function initVideoLoadingHandlers(card, video) {
+  if (!card || !video) return;
+
+  video.addEventListener('loadstart', () => card.classList.add('loading'));
+  video.addEventListener('loadedmetadata', () => card.classList.remove('loading'));
+  video.addEventListener('loadeddata', () => card.classList.remove('loading'));
+  video.addEventListener('canplay', () => card.classList.remove('loading'));
+  video.addEventListener('waiting', () => card.classList.add('loading'));
+  video.addEventListener('playing', () => card.classList.remove('loading'));
+
+  // Fallback: remove loading state after 5s (iOS)
+  setTimeout(() => card.classList.remove('loading'), 5000);
+}
+
+// ============================================
+// VIDEO CATEGORIES — TXT File System
+// ============================================
+
+const CATEGORIES = [
+  { slug: 'ugc',      label: 'UGC',       txt: 'ugc.txt',      route: 'ugc',         icon: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line>' },
+  { slug: 'shoting',  label: 'Shooting',  txt: 'shooting.txt', route: 'shooting',    icon: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle>' },
+  { slug: 'stores',   label: 'Stores',    txt: 'stores.txt',   route: 'stores',      icon: '<path d="M3 9l1-5h16l1 5"></path><path d="M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"></path><path d="M9 21v-6h6v6"></path><path d="M3 9h18"></path>' },
+  { slug: 'events',   label: 'Events',    txt: 'events.txt',   route: 'events',      icon: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>' },
+  { slug: 'services', label: 'Services',  txt: 'services.txt',  route: 'services',    icon: '<path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6L12 2z"></path>' },
+  { slug: 'gallery',  label: 'Gallery',   txt: 'gallery.txt',  route: 'gallery',     icon: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>', expanded: true },
+  { slug: 'drone',    label: 'Drone',     txt: 'drone.txt',     route: 'drone',       icon: '<path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.4-.1.9.3 1.1L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.2.4.7.5 1.1.3l.5-.2c.4-.3.6-.7.5-1.2z"></path>' }
+];
+
+// Build categoryLabels from CATEGORIES
+const categoryLabels = {};
+CATEGORIES.forEach(c => { categoryLabels[c.slug] = c.label; });
+
+// Static nav items rendered in the expanded section (no TXT data files)
+const EXPANDED_NAV_ITEMS = [
+  { label: 'Model',       nav: 'models',      href: '/model',       icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>' },
+  { label: 'Media Buyer', nav: 'media-buyer', href: '/media-buyer', icon: '<path d="M3 3v18h18"></path><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>' },
+  { label: 'Voice Over',  nav: 'voiceover',   href: '/voice-over',  icon: '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line>' }
+];
+
+// ============================================
+// CENTRAL CONFIG — Loaded from data/config.json
+// All editable content (titles, descriptions, SEO, etc.) is stored
+// in data/config.json. Edit that single file to customize the site.
+// ============================================
+let siteConfig = null;
+
+async function loadSiteConfig() {
+  try {
+    const response = await fetch('data/config.json');
+    if (!response.ok) return;
+    siteConfig = await response.json();
+  } catch {
+    siteConfig = null;
+  }
+}
+
+// Get a config value for a category slug, with fallback
+function getConfig(slug, key, fallback) {
+  if (!siteConfig || !siteConfig.categories || !siteConfig.categories[slug]) return fallback;
+  const val = siteConfig.categories[slug][key];
+  return (val !== undefined && val !== '') ? val : fallback;
+}
+
+// Build pageMeta from config (replaces hardcoded pageMeta object)
+// Fallback values ensure the site works even if config.json hasn't loaded yet.
+function buildPageMeta() {
+  const meta = {};
+
+  // Static pages — from config or hardcoded fallbacks
+  const sp = (siteConfig && siteConfig._static_pages) ? siteConfig._static_pages : {};
+  meta['home'] = {
+    title: sp.home ? sp.home.seoTitle : DEFAULT_TITLE,
+    desc: sp.home ? sp.home.seoDescription : DEFAULT_DESC,
+    crumb: sp.home ? sp.home.crumb : 'Home'
+  };
+  meta['home-portfolio'] = {
+    title: (sp['home-portfolio'] && sp['home-portfolio'].seoTitle) || 'Portfolio | Photography Pixel',
+    desc: (sp['home-portfolio'] && sp['home-portfolio'].seoDescription) || 'استعرض أحدث أعمالنا الإبداعية: فيديوهات UGC، تصوير، محلات تجارية، أعراس وخدمات احترافية في أيت ملول - أكادير.',
+    crumb: (sp['home-portfolio'] && sp['home-portfolio'].crumb) || 'Portfolio'
+  };
+  meta['home-contact'] = {
+    title: (sp['home-contact'] && sp['home-contact'].seoTitle) || 'Contact | Photography Pixel',
+    desc: (sp['home-contact'] && sp['home-contact'].seoDescription) || 'تواصل مع وكالة Photography Pixel لخدمات التصوير والتسويق الرقمي في أيت ملول - أكادير. واتساب، إنستغرام، بريد إلكتروني.',
+    crumb: (sp['home-contact'] && sp['home-contact'].crumb) || 'Contact'
+  };
+  meta['equipment'] = {
+    title: (sp.equipment && sp.equipment.seoTitle) || 'Equipment | Photography Pixel',
+    desc: (sp.equipment && sp.equipment.seoDescription) || 'تعرف على معدات الاستوديو الاحترافية المستخدمة في وكالة Photography Pixel.',
+    crumb: (sp.equipment && sp.equipment.crumb) || 'Equipment'
+  };
+
+  // Category pages (cat-{slug})
+  CATEGORIES.forEach(cat => {
+    const pageKey = 'cat-' + cat.slug;
+    meta[pageKey] = {
+      title: getConfig(cat.slug, 'seoTitle', cat.label + ' | Photography Pixel'),
+      desc: getConfig(cat.slug, 'seoDescription', ''),
+      crumb: getConfig(cat.slug, 'label', cat.label)
+    };
+  });
+
+  // Expanded nav items (models, media-buyer, voiceover)
+  EXPANDED_NAV_ITEMS.forEach(item => {
+    meta[item.nav] = {
+      title: getConfig(item.nav, 'seoTitle', item.label + ' | Photography Pixel'),
+      desc: getConfig(item.nav, 'seoDescription', ''),
+      crumb: getConfig(item.nav, 'label', item.label)
+    };
+  });
+
+  return meta;
+}
+
+// Apply config values to static HTML pages (models, media-buyer, voiceover)
+function applyConfigToStaticPages() {
+  if (!siteConfig) return;
+
+  const pageMap = {
+    'page-models': 'models',
+    'page-media-buyer': 'media-buyer',
+    'page-voiceover': 'voiceover',
+    'page-equipment': 'equipment'
+  };
+
+  for (const [pageId, slug] of Object.entries(pageMap)) {
+    const page = document.getElementById(pageId);
+    if (!page) continue;
+    const catConfig = siteConfig.categories && siteConfig.categories[slug];
+    if (!catConfig) continue;
+
+    const heading = page.querySelector('.sub-page-heading');
+    if (heading && catConfig.title) heading.textContent = catConfig.title;
+
+    const subtitle = page.querySelector('.sub-page-subtitle');
+    if (subtitle && catConfig.subtitle) subtitle.textContent = catConfig.subtitle;
+  }
+}
+
+// Fetch a TXT file and return an array of validated, deduplicated URLs
+async function fetchCategoryUrls(txtFile) {
+  try {
+    const response = await fetch('data/' + txtFile);
+    if (!response.ok) return [];
+    const text = await response.text();
+
+    // Remove UTF-8 BOM if present
+    const cleaned = text.replace(/^\uFEFF/, '');
+
+    const seen = new Set();
+    const urls = [];
+
+    for (const line of cleaned.split(/\r?\n/)) {
+      const url = line.trim();
+      if (!url) continue;
+      if (!/^https?:\/\//.test(url)) continue;
+      if (seen.has(url)) continue;
+      seen.add(url);
+      urls.push(url);
+    }
+
+    return urls;
+  } catch {
+    return [];
+  }
+}
+
+function createReelCard(url) {
+  const card = document.createElement('article');
+  card.className = 'reel-card';
+  card.innerHTML =
+    '<video controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="metadata">' +
+      '<source data-src="' + url + '" type="video/mp4">' +
+    '</video>';
+  return card;
+}
+
+// Lazy-load video sources via IntersectionObserver
+const lazyVideoObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const source = entry.target.querySelector('source');
+      if (source && source.dataset.src) {
+        const video = entry.target.querySelector('video');
+        source.src = source.dataset.src;
+        source.removeAttribute('data-src');
+        if (video) video.load();
+      }
+      lazyVideoObserver.unobserve(entry.target);
+    }
+  });
+}, { rootMargin: '300px 0px', threshold: 0.01 });
+
+function renderVideoCards(urls, containerId, slug, limit) {
+  const grid = document.getElementById(containerId);
+  if (!grid) return;
+
+  const list = limit ? urls.slice(0, limit) : urls;
+  const fragment = document.createDocumentFragment();
+
+  list.forEach(url => {
+    const card = createReelCard(url);
+    fragment.appendChild(card);
+
+    const video = card.querySelector('video');
+    initVideoLoadingHandlers(card, video);
+    lazyVideoObserver.observe(card);
+
+    card.classList.add('reveal-scale');
+    const delay = Math.min(Math.floor(fragment.children.length / 3), 5);
+    card.classList.add('reveal-delay-' + (delay + 1));
+    revealObserver.observe(card);
+  });
+
+  grid.innerHTML = '';
+  grid.appendChild(fragment);
+
+  enhanceReelCards();
+  forceActivateRevealCards(grid);
+}
+
+// Force-activate reveal cards already in viewport (iOS Safari fix)
+function forceActivateRevealCards(grid) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      grid.querySelectorAll('.reveal-scale:not(.active), .reveal:not(.active), .reveal-fade:not(.active)').forEach(el => {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < vh && rect.bottom > 0) {
+          el.classList.add('active');
+        }
+      });
+    });
+  });
+}
+
+function ensureCategoryContainers() {
+  if (CATEGORIES.length === 0) return;
+
+  const servicesNavMain = document.getElementById('services-nav-main');
+  const servicesNavExpanded = document.getElementById('services-nav-expanded');
+  const portfolioShell = document.querySelector('.portfolio-shell');
+  const mainEl = document.querySelector('main.page');
+  if (!portfolioShell) return;
+
+  function createCircleElement(label, nav, href, icon) {
+    const circle = document.createElement('a');
+    circle.href = href;
+    circle.className = 'service-circle';
+    circle.setAttribute('data-nav', nav);
+    circle.innerHTML =
+      '<div class="service-circle-icon">' +
+        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          icon +
+        '</svg>' +
+      '</div>' +
+      '<span class="service-circle-label">' + label + '</span>';
+    return circle;
+  }
+
+  CATEGORIES.forEach(cat => {
+    const slug = cat.slug;
+
+    // Featured preview block on homepage
+    if (!document.getElementById('home-grid-' + slug)) {
+      const preview = document.createElement('div');
+      preview.className = 'featured-preview';
+      preview.innerHTML =
+        '<h3 class="featured-preview-title">' + getConfig(slug, 'title', cat.label) + '</h3>' +
+        '<div class="video-grid active" data-panel="' + slug + '" id="home-grid-' + slug + '"></div>' +
+        '<a href="/' + cat.route + '" class="view-all-btn" data-nav="cat-' + slug + '">' + getConfig(slug, 'buttonLabel', 'View All →') + '</a>';
+      portfolioShell.appendChild(preview);
+    }
+
+    // Service circle in nav — main or expanded section
+    const navTarget = cat.expanded ? servicesNavExpanded : servicesNavMain;
+    const navAttr = 'cat-' + slug;
+    if (navTarget && !navTarget.querySelector('[data-nav="' + navAttr + '"]')) {
+      navTarget.appendChild(createCircleElement(getConfig(slug, 'label', cat.label), navAttr, '/' + cat.route, cat.icon));
+    }
+
+    // Category page-view
+    if (!document.getElementById('page-cat-' + slug)) {
+      const pageView = document.createElement('div');
+      pageView.className = 'page-view';
+      pageView.id = 'page-cat-' + slug;
+      pageView.setAttribute('data-page', 'cat-' + slug);
+      pageView.innerHTML =
+        '<section class="sub-page-section reveal">' +
+          '<h2 class="sub-page-heading">' + getConfig(slug, 'title', cat.label) + '</h2>' +
+          '<p class="sub-page-subtitle">' + getConfig(slug, 'subtitle', cat.label + ' Videos') + '</p>' +
+          '<div class="video-grid" data-panel="' + slug + '-full" id="grid-cat-' + slug + '"></div>' +
+        '</section>';
+      if (mainEl) mainEl.appendChild(pageView);
+    }
+  });
+
+  // Render static expanded nav items (Model, Media Buyer, Voice Over)
+  if (servicesNavExpanded) {
+    EXPANDED_NAV_ITEMS.forEach(item => {
+      if (!servicesNavExpanded.querySelector('[data-nav="' + item.nav + '"]')) {
+        servicesNavExpanded.appendChild(createCircleElement(getConfig(item.nav, 'label', item.label), item.nav, item.href, item.icon));
+      }
+    });
+  }
+
+  // Initialize toggle button
+  const toggleBtn = document.getElementById('categories-toggle');
+  if (toggleBtn && !toggleBtn._toggleBound) {
+    toggleBtn._toggleBound = true;
+    toggleBtn.addEventListener('click', function() {
+      const isOpen = this.getAttribute('aria-expanded') === 'true';
+      this.setAttribute('aria-expanded', String(!isOpen));
+      if (servicesNavExpanded) {
+        servicesNavExpanded.setAttribute('aria-hidden', String(isOpen));
+        servicesNavExpanded.classList.toggle('open');
+      }
+    });
+  }
+
+  // Refresh navItems collection
+  navItems = Array.from(document.querySelectorAll('[data-nav]'));
+  navItems.forEach(item => {
+    if (item.id === 'menu-btn') return;
+    if (item._routerBound) return;
+    item._routerBound = true;
+    item.addEventListener('click', function(e) {
+      const nav = this.dataset.nav;
+      if (!nav) return;
+      e.preventDefault();
+      navigateTo(nav);
+      if (menuPanel && menuPanel.classList.contains('active')) closeMenu();
+    });
+  });
+}
+
+async function loadVideoCategories() {
+  await loadSiteConfig();
+  pageMeta = buildPageMeta();
+  applyConfigToStaticPages();
+  ensureCategoryContainers();
+  handleRoute();
+
+  await Promise.all(CATEGORIES.map(async cat => {
+    const urls = await fetchCategoryUrls(cat.txt);
+    if (urls.length === 0) return;
+
+    renderVideoCards(urls, 'home-grid-' + cat.slug, cat.slug, 3);
+    renderVideoCards(urls, 'grid-cat-' + cat.slug, cat.slug);
+  }));
+}
+
+// ============================================
+// YEAR
+// ============================================
 if (year) {
   year.textContent = new Date().getFullYear();
 }
 
-function pauseAllVideos() {
-  document.querySelectorAll("video").forEach((video) => video.pause());
-}
-
-tabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    const filter = tab.dataset.filter;
-
-    tabs.forEach((item) => {
-      const isActive = item === tab;
-      item.classList.toggle("active", isActive);
-      item.setAttribute("aria-selected", String(isActive));
-    });
-
-    panels.forEach((panel) => {
-      panel.classList.toggle("active", panel.dataset.panel === filter);
-    });
-
-    pauseAllVideos();
-  });
-});
-
+// ============================================
+// IMAGE PREVIEW / LIGHTBOX
+// ============================================
 function openImagePreview(opener) {
   if (!imageModal || !modalImage) return;
 
   modalImage.src = opener.dataset.lightboxSrc;
-  modalImage.alt = opener.dataset.lightboxAlt || "";
-  imageModal.classList.add("active");
-  imageModal.setAttribute("aria-hidden", "false");
-  document.body.classList.add("modal-open");
+  modalImage.alt = opener.dataset.lightboxAlt || '';
+  imageModal.classList.add('active');
+  imageModal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
 }
 
 function closeImagePreview() {
   if (!imageModal || !modalImage) return;
 
-  imageModal.classList.remove("active");
-  imageModal.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("modal-open");
-  modalImage.removeAttribute("src");
-  modalImage.alt = "";
+  imageModal.classList.remove('active');
+  imageModal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+  modalImage.removeAttribute('src');
+  modalImage.alt = '';
 }
 
-mediaOpeners.forEach((opener) => {
-  opener.addEventListener("click", () => openImagePreview(opener));
+mediaOpeners.forEach(opener => {
+  opener.addEventListener('click', () => openImagePreview(opener));
 });
 
 if (modalClose) {
-  modalClose.addEventListener("click", closeImagePreview);
+  modalClose.addEventListener('click', closeImagePreview);
 }
 
 if (imageModal) {
-  imageModal.addEventListener("click", (event) => {
-    if (event.target === imageModal) {
-      closeImagePreview();
+  imageModal.addEventListener('click', event => {
+    if (event.target === imageModal) closeImagePreview();
+  });
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeImagePreview();
+});
+
+// ============================================
+// VIDEO SEARCH
+// ============================================
+let searchIndex = null;
+
+async function getSearchIndex() {
+  if (searchIndex) return searchIndex;
+
+  searchIndex = [];
+
+  const results = await Promise.all(
+    CATEGORIES.map(async cat => {
+      const urls = await fetchCategoryUrls(cat.txt);
+      return urls.map(url => ({
+        title: decodeURIComponent(url.split('/').pop() || '') || url,
+        video: url,
+        category: cat.slug
+      }));
+    })
+  );
+
+  searchIndex = results.flat();
+  return searchIndex;
+}
+
+function renderSearchResults(query) {
+  const resultsContainer = document.getElementById('video-search-results');
+  const grid = document.getElementById('search-results-grid');
+  const countEl = document.getElementById('search-results-count');
+  const noResultsEl = document.getElementById('search-no-results');
+  const featuredPreviews = document.querySelectorAll('.featured-preview');
+
+  if (!resultsContainer || !grid) return;
+
+  if (!query || query.trim() === '') {
+    resultsContainer.hidden = true;
+    if (noResultsEl) noResultsEl.hidden = true;
+    featuredPreviews.forEach(el => el.style.display = '');
+    return;
+  }
+
+  const q = query.toLowerCase().trim();
+  const results = searchIndex.filter(item =>
+    (item.title || '').toLowerCase().includes(q)
+  );
+
+  featuredPreviews.forEach(el => el.style.display = 'none');
+  resultsContainer.hidden = false;
+
+  if (countEl) {
+    countEl.textContent = results.length + ' result' + (results.length !== 1 ? 's' : '') + ' for "' + query.trim() + '"';
+  }
+
+  grid.innerHTML = '';
+
+  if (results.length === 0) {
+    if (noResultsEl) noResultsEl.hidden = false;
+    return;
+  }
+
+  if (noResultsEl) noResultsEl.hidden = true;
+
+  const fragment = document.createDocumentFragment();
+
+  results.forEach(item => {
+    const card = createReelCard(item.video);
+    fragment.appendChild(card);
+
+    const video = card.querySelector('video');
+    initVideoLoadingHandlers(card, video);
+    lazyVideoObserver.observe(card);
+
+    card.classList.add('reveal-scale');
+    const delay = Math.min(Math.floor(fragment.children.length / 3), 5);
+    card.classList.add('reveal-delay-' + (delay + 1));
+    revealObserver.observe(card);
+  });
+
+  grid.appendChild(fragment);
+  enhanceReelCards();
+  forceActivateRevealCards(grid);
+
+  // Set correct category tag per card (enhanceReelCards uses grid's data-panel)
+  grid.querySelectorAll('.reel-card').forEach((card, i) => {
+    const tag = card.querySelector('.reel-tag');
+    if (tag) {
+      tag.textContent = categoryLabels[results[i].category] || results[i].category;
     }
   });
 }
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closeImagePreview();
-  }
-});
+function initVideoSearch() {
+  const input = document.getElementById('video-search-input');
+  if (!input) return;
 
+  const debouncedSearch = debounce(async function() {
+    await getSearchIndex();
+    renderSearchResults(input.value);
+  }, 200);
 
+  input.addEventListener('input', debouncedSearch);
+}
 
-// Initialize existing videos with premium styling
-document.querySelectorAll("video").forEach(video => {
-  video.setAttribute("controlsList", "nodownload noplaybackrate");
-  video.disablePictureInPicture = true;
-  
-  const card = video.closest(".reel-card");
-  if (card) {
-    // Add loading handlers
-    video.addEventListener("loadstart", () => {
-      card.classList.add("loading");
-    });
-    
-    video.addEventListener("loadedmetadata", () => {
-      card.classList.remove("loading");
-    });
-    
-    video.addEventListener("loadeddata", () => {
-      card.classList.remove("loading");
-    });
-
-    video.addEventListener("canplay", () => {
-      card.classList.remove("loading");
-    });
-    
-    video.addEventListener("waiting", () => {
-      card.classList.add("loading");
-    });
-    
-    video.addEventListener("playing", () => {
-      card.classList.remove("loading");
-    });
-
-    // Fallback: remove loading state after 5s (iOS)
-    setTimeout(() => card.classList.remove("loading"), 5000);
-  }
-});
-
-// Mobile Navigation Toggle
+// ============================================
+// MOBILE NAVIGATION TOGGLE
+// ============================================
 if (navToggle && navMenu) {
-  navToggle.addEventListener("click", () => {
-    const isActive = navToggle.classList.toggle("active");
-    navMenu.classList.toggle("active");
-    navToggle.setAttribute("aria-expanded", String(isActive));
-    navToggle.setAttribute("aria-label", isActive ? "إغلاق القائمة" : "فتح القائمة");
+  navToggle.addEventListener('click', () => {
+    const isActive = navToggle.classList.toggle('active');
+    navMenu.classList.toggle('active');
+    navToggle.setAttribute('aria-expanded', String(isActive));
+    navToggle.setAttribute('aria-label', isActive ? 'إغلاق القائمة' : 'فتح القائمة');
   });
 
-  // Close menu when clicking a link
   navLinks.forEach(link => {
-    link.addEventListener("click", () => {
-      navMenu.classList.remove("active");
-      navToggle.classList.remove("active");
-      navToggle.setAttribute("aria-expanded", "false");
-      navToggle.setAttribute("aria-label", "فتح القائمة");
+    link.addEventListener('click', () => {
+      navMenu.classList.remove('active');
+      navToggle.classList.remove('active');
+      navToggle.setAttribute('aria-expanded', 'false');
+      navToggle.setAttribute('aria-label', 'فتح القائمة');
     });
   });
 
-  // Close menu when clicking outside
-  document.addEventListener("click", (event) => {
+  document.addEventListener('click', event => {
     if (!navToggle.contains(event.target) && !navMenu.contains(event.target)) {
-      navMenu.classList.remove("active");
-      navToggle.classList.remove("active");
-      navToggle.setAttribute("aria-expanded", "false");
-      navToggle.setAttribute("aria-label", "فتح القائمة");
+      navMenu.classList.remove('active');
+      navToggle.classList.remove('active');
+      navToggle.setAttribute('aria-expanded', 'false');
+      navToggle.setAttribute('aria-label', 'فتح القائمة');
     }
   });
 }
 
-// Active nav link on scroll
+// ============================================
+// ACTIVE NAV LINK ON SCROLL
+// ============================================
 function updateActiveNavLink() {
-  const sections = document.querySelectorAll("section[id], main[id], footer[id]");
+  const sections = document.querySelectorAll('section[id], main[id], footer[id]');
   const scrollPosition = window.scrollY + 100;
 
   sections.forEach(section => {
     const sectionTop = section.offsetTop;
     const sectionHeight = section.offsetHeight;
-    const sectionId = section.getAttribute("id");
+    const sectionId = section.getAttribute('id');
 
     if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
       navLinks.forEach(link => {
-        link.classList.remove("active");
-        if (link.getAttribute("href") === `#${sectionId}`) {
-          link.classList.add("active");
+        link.classList.remove('active');
+        if (link.getAttribute('href') === `#${sectionId}`) {
+          link.classList.add('active');
         }
       });
     }
   });
 }
 
-window.addEventListener("scroll", updateActiveNavLink);
-updateActiveNavLink();
+window.addEventListener('scroll', throttle(updateActiveNavLink, 100), { passive: true });
 
-// Premium Floating Bottom Navigation
-const bottomNav = document.querySelector("#bottom-nav");
-const bottomNavItems = document.querySelectorAll(".bottom-nav-item");
-const menuBtn = document.querySelector("#menu-btn");
-const menuPanel = document.querySelector("#menu-panel");
-const menuClose = document.querySelector("#menu-close");
-const menuItems = document.querySelectorAll(".menu-item");
-
-// Bottom nav click handler
-bottomNavItems.forEach(item => {
-  item.addEventListener("click", function(e) {
-    // Remove active from all items
-    bottomNavItems.forEach(i => i.classList.remove("active"));
-    // Add active to clicked item
-    this.classList.add("active");
-  });
-});
-
-// Menu panel functionality
-if (menuBtn && menuPanel) {
-  menuBtn.addEventListener("click", () => {
-    menuPanel.classList.add("active");
-    menuPanel.setAttribute("aria-hidden", "false");
-    document.body.style.overflow = "hidden";
-    document.body.style.touchAction = "none";
-  });
-
-  menuClose.addEventListener("click", closeMenu);
-
-  menuItems.forEach(item => {
-    item.addEventListener("click", () => {
-      closeMenu();
-    });
-  });
-
-  menuPanel.addEventListener("click", (e) => {
-    if (e.target === menuPanel) {
-      closeMenu();
-    }
-  });
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && menuPanel.classList.contains("active")) {
-      closeMenu();
-    }
-  });
-
-  function closeMenu() {
-    menuPanel.classList.remove("active");
-    menuPanel.setAttribute("aria-hidden", "true");
-    document.body.style.overflow = "";
-    document.body.style.touchAction = "";
-  }
+// ============================================
+// MENU PANEL
+// ============================================
+function closeMenu() {
+  if (!menuPanel) return;
+  menuPanel.classList.remove('active');
+  menuPanel.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  document.body.style.touchAction = '';
 }
 
-// Add ripple effect to bottom nav items
+if (menuBtn && menuPanel) {
+  menuBtn.addEventListener('click', () => {
+    menuPanel.classList.add('active');
+    menuPanel.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+  });
+
+  if (menuClose) {
+    menuClose.addEventListener('click', closeMenu);
+  }
+
+  menuItems.forEach(item => {
+    item.addEventListener('click', closeMenu);
+  });
+
+  menuPanel.addEventListener('click', e => {
+    if (e.target === menuPanel) closeMenu();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && menuPanel.classList.contains('active')) {
+      closeMenu();
+    }
+  });
+}
+
+// ============================================
+// BOTTOM NAVIGATION
+// Click handler: active state toggle + ripple effect
+// ============================================
 bottomNavItems.forEach(item => {
-  item.addEventListener("click", function(e) {
-    const ripple = document.createElement("span");
-    ripple.style.position = "absolute";
-    ripple.style.width = "20px";
-    ripple.style.height = "20px";
-    ripple.style.background = "rgba(59, 130, 246, 0.3)";
-    ripple.style.borderRadius = "50%";
-    ripple.style.transform = "translate(-50%, -50%)";
-    ripple.style.pointerEvents = "none";
-    ripple.style.animation = "ripple 0.6s ease-out";
-    
+  item.addEventListener('click', function(e) {
+    bottomNavItems.forEach(i => i.classList.remove('active'));
+    this.classList.add('active');
+
+    // Ripple effect
+    const ripple = document.createElement('span');
+    ripple.className = 'ripple';
     const rect = this.getBoundingClientRect();
-    ripple.style.left = (e.clientX - rect.left) + "px";
-    ripple.style.top = (e.clientY - rect.top) + "px";
-    
+    ripple.style.left = (e.clientX - rect.left) + 'px';
+    ripple.style.top = (e.clientY - rect.top) + 'px';
     this.appendChild(ripple);
-    
     setTimeout(() => ripple.remove(), 600);
   });
 });
 
-// Add ripple animation
-const style = document.createElement("style");
-style.textContent = `
-  @keyframes ripple {
-    to {
-      width: 100px;
-      height: 100px;
-      opacity: 0;
-    }
+// ============================================
+// SPA ROUTER — Clean URL Routing
+// ============================================
+
+// Route map: URL path → page name
+const ROUTES = {
+  'ugc': 'cat-ugc',
+  'stores': 'cat-stores',
+  'events': 'cat-events',
+  'shooting': 'cat-shoting',
+  'photography': 'cat-services',
+  'services': 'cat-services',
+  'gallery': 'cat-gallery',
+  'drone': 'cat-drone',
+  'portfolio': 'home-portfolio',
+  'voice-over': 'voiceover',
+  'media-buyer': 'media-buyer',
+  'model': 'models',
+  'contact': 'home-contact',
+  'equipment': 'equipment'
+};
+
+// Reverse map: page name → URL path
+const PAGE_TO_ROUTE = {};
+for (const [path, page] of Object.entries(ROUTES)) {
+  PAGE_TO_ROUTE[page] = path;
+}
+PAGE_TO_ROUTE['home'] = '';
+
+// Detect base path once at load time (handles root and subdirectory deployments)
+const BASE_PATH = (function() {
+  const segments = window.location.pathname.split('/').filter(Boolean);
+
+  if (segments.length === 0) return '';
+
+  // If first segment is a known route, we're at root
+  if (ROUTES[segments[0]]) return '';
+
+  // If second segment is a known route, first segment is the base
+  if (segments.length > 1 && ROUTES[segments[1]]) return '/' + segments[0];
+
+  // No route in URL — entire path (minus filename) is the base
+  return window.location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
+})();
+
+function buildUrl(route) {
+  return route ? BASE_PATH + '/' + route : BASE_PATH + '/';
+}
+
+function getCurrentRoute() {
+  let path = window.location.pathname;
+  if (BASE_PATH && path.startsWith(BASE_PATH)) {
+    path = path.slice(BASE_PATH.length);
   }
-`;
-document.head.appendChild(style);
+  return path.replace(/^\//, '').replace(/\/$/, '');
+}
+
+function navigateTo(pageName) {
+  const route = PAGE_TO_ROUTE[pageName] ?? '';
+  const currentRoute = getCurrentRoute();
+
+  // Don't push duplicate history entries
+  if (route === currentRoute) {
+    showPage(pageName);
+    return;
+  }
+
+  history.pushState({ page: pageName }, '', buildUrl(route));
+  showPage(pageName);
+}
+
+function handleRoute() {
+  const route = getCurrentRoute();
+  let pageName = ROUTES[route] || 'home';
+
+  // If route is unknown, check if it matches a dynamic category pattern
+  if (pageName === 'home' && route && !route.startsWith('api/')) {
+    // Try matching as a category route — will be resolved after API loads
+    // For now, show home; the real page will be shown once categories are registered
+    pageName = 'home';
+  }
+
+  showPage(pageName);
+}
+
+window.addEventListener('popstate', handleRoute);
+
+// ============================================
+// DYNAMIC SEO META UPDATES
+// ============================================
+const BASE_URL = 'https://abdellahafkhar7-a11y.github.io/photographyportfolio';
+const DEFAULT_TITLE = 'Photography Pixel | وكالة تصوير وتسويق رقمي في أيت ملول - أكادير';
+const DEFAULT_DESC = 'Photography Pixel: وكالة تصوير وتسويق رقمي متخصصة في صناعة المحتوى، تصوير المنتجات، المحلات التجارية، فيديوهات UGC والأعراس في أيت ملول - أكادير.';
+
+// pageMeta is now built dynamically from data/config.json via buildPageMeta().
+// Fallback values ensure the site works even if config.json fails to load.
+let pageMeta = buildPageMeta();
+
+function updatePageMeta(pageName) {
+  const meta = pageMeta[pageName] || pageMeta['home'];
+
+  // Title
+  document.title = meta.title;
+
+  // Description
+  setMetaContent('meta[name="description"]', meta.desc);
+
+  // Canonical
+  const route = PAGE_TO_ROUTE[pageName] ?? '';
+  const canonical = BASE_URL + '/' + route;
+  const canonicalEl = document.querySelector('link[rel="canonical"]');
+  if (canonicalEl) canonicalEl.setAttribute('href', canonical);
+
+  // Open Graph
+  setMetaContent('meta[property="og:title"]', meta.title);
+  setMetaContent('meta[property="og:description"]', meta.desc);
+  setMetaContent('meta[property="og:url"]', canonical);
+
+  // Twitter
+  setMetaContent('meta[name="twitter:title"]', meta.title);
+  setMetaContent('meta[name="twitter:description"]', meta.desc);
+
+  // BreadcrumbList JSON-LD
+  const breadcrumbScripts = document.querySelectorAll('script[type="application/ld+json"]');
+  breadcrumbScripts.forEach(script => {
+    try {
+      const data = JSON.parse(script.textContent);
+      if (data['@type'] === 'BreadcrumbList') {
+        data.itemListElement = [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: BASE_URL + '/'
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: meta.crumb,
+            item: canonical
+          }
+        ];
+        script.textContent = JSON.stringify(data, null, 2);
+      }
+    } catch (e) { /* skip non-JSON blocks */ }
+  });
+}
+
+function setMetaContent(selector, content) {
+  const el = document.querySelector(selector);
+  if (el) el.setAttribute('content', content);
+}
 
 // ============================================
 // SPA PAGE NAVIGATION SYSTEM
 // ============================================
-
-const pageViews = document.querySelectorAll('.page-view');
-const navItems = document.querySelectorAll('[data-nav]');
-
-function showPage(pageName, scrollTarget) {
-  // Pause all videos when leaving a page
+function showPage(pageName) {
   pauseAllVideos();
 
-  // Hide all page views
-  pageViews.forEach(pv => pv.classList.remove('active'));
+  updatePageMeta(pageName);
 
-  // Show the target page
+  // Re-query page views to include dynamically created pages
+  const allPageViews = document.querySelectorAll('.page-view');
+  allPageViews.forEach(pv => pv.classList.remove('active'));
+
   const targetPage = document.getElementById('page-' + pageName);
   if (targetPage) {
     targetPage.classList.add('active');
@@ -289,22 +846,27 @@ function showPage(pageName, scrollTarget) {
   // Update bottom nav active states
   bottomNavItems.forEach(item => {
     item.classList.remove('active');
-    if (item.dataset.nav === pageName || 
-        (pageName === 'home' && item.dataset.nav === 'home')) {
+    if (item.dataset.nav === pageName) {
+      item.classList.add('active');
+    }
+  });
+
+  // Update category card active states
+  document.querySelectorAll('.services-nav .service-circle, .services-nav-expanded .service-circle').forEach(item => {
+    item.classList.remove('active');
+    if (item.dataset.nav === pageName) {
       item.classList.add('active');
     }
   });
 
   // Handle scroll targets for home page
   if (pageName === 'home' || pageName.indexOf('home') === 0) {
-    // Show home page
     const homePage = document.getElementById('page-home');
     if (homePage && !homePage.classList.contains('active')) {
       pageViews.forEach(pv => pv.classList.remove('active'));
       homePage.classList.add('active');
     }
 
-    // Determine scroll target
     if (pageName === 'home-portfolio') {
       setTimeout(() => {
         const portfolio = document.getElementById('portfolio');
@@ -316,19 +878,14 @@ function showPage(pageName, scrollTarget) {
         if (contact) contact.scrollIntoView(true);
       }, 50);
     } else {
-      // Default: scroll to top
       window.scrollTo(0, 0);
     }
   } else {
-    // Non-home pages: scroll to top
     window.scrollTo(0, 0);
   }
 
-  // Trigger reveal observer for newly visible elements.
-  // When navigating to home-portfolio / home-contact, targetPage is null
-  // (no page-home-portfolio element exists), so use the home page as the
-  // reveal container to ensure its children get re-observed.
-  var revealContainer = targetPage;
+  // Trigger reveal observer for newly visible elements
+  let revealContainer = targetPage;
   if (!revealContainer && pageName.indexOf('home') === 0) {
     revealContainer = document.getElementById('page-home');
   }
@@ -339,47 +896,22 @@ function showPage(pageName, scrollTarget) {
       }
     });
 
-    // Force-activate reveal elements already in viewport — the
-    // IntersectionObserver callback is async and may not fire promptly
-    // when a page-view was just switched from display:none to block
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        var vh = window.innerHeight || document.documentElement.clientHeight;
-        revealContainer.querySelectorAll('.reveal:not(.active), .reveal-fade:not(.active), .reveal-scale:not(.active)').forEach(el => {
-          var rect = el.getBoundingClientRect();
-          if (rect.top < vh && rect.bottom > 0) {
-            el.classList.add('active');
-          }
-        });
-      });
-    });
+    // Force-activate reveal elements already in viewport
+    forceActivateRevealCards(revealContainer);
   }
 }
 
 // Attach click handlers to all [data-nav] elements
 navItems.forEach(item => {
-  if (item.id === 'menu-btn') return; // Skip the menu button
+  if (item.id === 'menu-btn') return;
 
   item.addEventListener('click', function(e) {
     const nav = this.dataset.nav;
     if (!nav) return;
 
-    // For home-related navs that use hash links, let default behavior handle scroll
-    if (nav === 'home' || nav === 'home-portfolio' || nav === 'home-contact') {
-      // Only prevent default if we need to switch pages
-      const homePage = document.getElementById('page-home');
-      if (!homePage || !homePage.classList.contains('active')) {
-        e.preventDefault();
-        showPage(nav);
-      }
-      // Otherwise let the hash link work normally
-    } else {
-      // For models, media-buyer, equipment: prevent default and switch page
-      e.preventDefault();
-      showPage(nav);
-    }
+    e.preventDefault();
+    navigateTo(nav);
 
-    // Close menu panel if open
     if (menuPanel && menuPanel.classList.contains('active')) {
       closeMenu();
     }
@@ -387,9 +919,9 @@ navItems.forEach(item => {
 });
 
 // ============================================
-// MODEL BOOKING - WHATSAPP MESSAGE (event delegation for dynamic cards)
+// MODEL BOOKING - WHATSAPP MESSAGE
+// Event delegation for dynamic cards
 // ============================================
-
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('.model-book-btn');
   if (!btn) return;
@@ -421,7 +953,6 @@ document.addEventListener('click', function(e) {
 // ============================================
 // DYNAMIC MODELS LOADER
 // ============================================
-
 function createModelCard(model) {
   const card = document.createElement('article');
   card.className = 'model-card reveal-scale';
@@ -447,7 +978,7 @@ function createModelCard(model) {
         <span class="model-attr"><span class="model-attr-label">الخبرة</span><span class="model-attr-value">${model.experience}</span></span>
       </div>
       <p class="model-desc">${model.description}</p>
-      <a href="#" class="button primary model-book-btn">احجز هذا المودل</a>
+      <a href="#" class="button primary model-book-btn">${getConfig('models', 'ctaText', 'احجز هذا المودل')}</a>
     </div>
   `;
 
@@ -464,20 +995,19 @@ async function loadModels() {
 
     grid.innerHTML = '';
 
-    models.forEach((model) => {
+    models.forEach(model => {
       const card = createModelCard(model);
       grid.appendChild(card);
       revealObserver.observe(card);
     });
   } catch (error) {
-    console.error('Failed to load models:', error);
+    // Failed to load models — grid stays empty
   }
 }
 
 // ============================================
 // DYNAMIC MEDIA BUYER LOADER
 // ============================================
-
 function createBuyerCard(campaign) {
   const card = document.createElement('article');
   card.className = 'buyer-card reveal-scale';
@@ -511,21 +1041,19 @@ async function loadMediaBuyer() {
 
     grid.innerHTML = '';
 
-    campaigns.forEach((campaign) => {
+    campaigns.forEach(campaign => {
       const card = createBuyerCard(campaign);
       grid.appendChild(card);
       revealObserver.observe(card);
     });
   } catch (error) {
-    console.error('Failed to load media buyer campaigns:', error);
+    // Failed to load media buyer campaigns — grid stays empty
   }
 }
 
 // ============================================
 // SCROLL REVEAL ANIMATIONS
 // ============================================
-
-// Intersection Observer for scroll reveal
 const observerOptions = {
   root: null,
   rootMargin: '0px 0px -100px 0px',
@@ -536,164 +1064,84 @@ const revealCallback = (entries, observer) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
       entry.target.classList.add('active');
-      // Optional: unobserve after animation to improve performance
-      // observer.unobserve(entry.target);
     }
   });
 };
 
 const revealObserver = new IntersectionObserver(revealCallback, observerOptions);
 
-// Observe all reveal elements
+// ============================================
+// DOM CONTENT LOADED
+// ============================================
 document.addEventListener('DOMContentLoaded', () => {
-  // Ensure page always opens at the top
   window.scrollTo(0, 0);
 
-  // Load models dynamically from JSON
-  loadModels();
+  // loadVideoCategories() calls handleRoute() after dynamic pages are created.
+  // Calling handleRoute() here would race — category page-views don't exist yet.
 
-  // Load media buyer campaigns dynamically from JSON
-  loadMediaBuyer();
+  // Critical path: load video categories first
+  loadVideoCategories();
+  initVideoSearch();
 
-  // Ensure UGC is the default active category
-  const ugcTab = document.querySelector('.tab[data-filter="ugc"]');
-  const ugcPanel = document.querySelector('.video-grid[data-panel="ugc"]');
-  if (ugcTab && ugcPanel) {
-    tabs.forEach(t => t.classList.remove('active'));
-    panels.forEach(p => p.classList.remove('active'));
-    ugcTab.classList.add('active');
-    ugcPanel.classList.add('active');
+  // Defer non-critical loaders to idle
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => { loadModels(); loadMediaBuyer(); });
+  } else {
+    setTimeout(() => { loadModels(); loadMediaBuyer(); }, 200);
   }
 
-  // Reveal on scroll
-  const revealElements = document.querySelectorAll('.reveal, .reveal-fade, .reveal-scale');
-  revealElements.forEach(el => revealObserver.observe(el));
+  // Add reveal classes to key elements (single query batch)
+  const revealAdditions = [
+    ['.profile-card', 'reveal'],
+    ['.portfolio-shell', 'reveal reveal-delay-2'],
+    ['.footer', 'reveal reveal-delay-3'],
+    ['.avatar-ring', 'reveal-scale'],
+    ['.profile-info', 'reveal reveal-delay-1'],
+    ['.profile-line', 'reveal reveal-delay-2'],
+    ['.bio', 'reveal-fade reveal-delay-2']
+  ];
 
-  // Add reveal classes to key elements
-  const profileCard = document.querySelector('.profile-card');
-  const portfolioShell = document.querySelector('.portfolio-shell');
-  const footer = document.querySelector('.footer');
-  const reelCards = document.querySelectorAll('.reel-card');
-
-  if (profileCard) {
-    profileCard.classList.add('reveal');
-    revealObserver.observe(profileCard);
-  }
-
-  if (portfolioShell) {
-    portfolioShell.classList.add('reveal');
-    portfolioShell.classList.add('reveal-delay-2');
-    revealObserver.observe(portfolioShell);
-  }
-
-  if (footer) {
-    footer.classList.add('reveal');
-    footer.classList.add('reveal-delay-3');
-    revealObserver.observe(footer);
-  }
-
-  // Stagger reel cards with reveal-scale
-  reelCards.forEach((card, index) => {
-    card.classList.add('reveal-scale');
-    // Add staggered delay based on index
-    const delay = Math.min(Math.floor(index / 3) + 1, 5);
-    card.classList.add(`reveal-delay-${delay}`);
-    revealObserver.observe(card);
+  revealAdditions.forEach(([sel, cls]) => {
+    const el = document.querySelector(sel);
+    if (el) {
+      el.classList.add(...cls.split(' '));
+    }
   });
 
-  // Add reveal to profile elements
-  const avatar = document.querySelector('.avatar-ring');
-  const profileInfo = document.querySelector('.profile-info');
-  const profileLine = document.querySelector('.profile-line');
-  const bio = document.querySelector('.bio');
+  // Observe all reveal elements in a single pass
+  document.querySelectorAll('.reveal, .reveal-fade, .reveal-scale').forEach(el => {
+    revealObserver.observe(el);
+  });
 
-  if (avatar) {
-    avatar.classList.add('reveal-scale');
-    revealObserver.observe(avatar);
-  }
-
-  if (profileInfo) {
-    profileInfo.classList.add('reveal');
-    profileInfo.classList.add('reveal-delay-1');
-    revealObserver.observe(profileInfo);
-  }
-
-  if (profileLine) {
-    profileLine.classList.add('reveal');
-    profileLine.classList.add('reveal-delay-2');
-    revealObserver.observe(profileLine);
-  }
-
-  if (bio) {
-    bio.classList.add('reveal-fade');
-    bio.classList.add('reveal-delay-2');
-    revealObserver.observe(bio);
-  }
-
-  // Observe profile location
-  const profileLocation = document.querySelector('.profile-location');
-  if (profileLocation) {
-    revealObserver.observe(profileLocation);
-  }
-
-  // Observe profile actions
-  const profileActions = document.querySelector('.profile-actions');
-  if (profileActions) {
-    revealObserver.observe(profileActions);
-  }
-
-  // Add page transition class
+  // Page transition
   document.body.classList.add('page-transition');
-
-  // Remove page-transition after animation completes.
-  // Do NOT wait for the load event — on iOS Safari with many <video preload="metadata">,
-  // load is delayed significantly, keeping a transform on body that breaks
-  // IntersectionObserver root calculations and blocks the initial render.
   setTimeout(() => {
     document.body.classList.remove('page-transition');
   }, 600);
 
-  // Force-activate reveal elements that are already in the viewport on initial load.
-  // On iOS Safari the IntersectionObserver callback may not fire synchronously after
-  // observe() — it is scheduled for a future frame. If the layout isn't stable yet
-  // (due to the overflow or transform issues above), the callback can be delayed
-  // indefinitely, leaving the gallery invisible until the user interacts.
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-      document.querySelectorAll('.reveal:not(.active), .reveal-fade:not(.active), .reveal-scale:not(.active)').forEach(el => {
-        var rect = el.getBoundingClientRect();
-        if (rect.top < vh && rect.bottom > 0) {
-          el.classList.add('active');
-        }
-      });
-    });
-  });
+  // Force-activate reveal elements already in viewport (single layout pass)
+  forceActivateRevealCards(document);
 
-  // Enhance video cards with overlays
-  enhanceReelCards();
+  // Defer overlay enhancement to idle time
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => enhanceReelCards());
+  } else {
+    setTimeout(() => enhanceReelCards(), 200);
+  }
 });
 
 // ============================================
 // VIDEO CARD OVERLAYS
 // ============================================
-var categoryLabels = {
-  ugc: 'UGC',
-  shoting: 'Shooting',
-  stores: 'Stores',
-  events: 'Events',
-  services: 'Services'
-};
-
 function enhanceReelCards() {
-  document.querySelectorAll('.reel-card').forEach(function(card) {
+  document.querySelectorAll('.reel-card').forEach(card => {
     if (card.querySelector('.reel-overlay')) return;
 
-    var grid = card.closest('.video-grid');
-    var panel = grid ? grid.dataset.panel : '';
-    var label = categoryLabels[panel] || '';
+    const grid = card.closest('.video-grid');
+    const panel = grid ? (grid.dataset.panel || '').replace('-full', '') : '';
+    const label = categoryLabels[panel] || '';
 
-    var overlay = document.createElement('div');
+    const overlay = document.createElement('div');
     overlay.className = 'reel-overlay';
     overlay.innerHTML =
       '<span class="reel-tag">' + label + '</span>' +
@@ -704,167 +1152,44 @@ function enhanceReelCards() {
 
     card.appendChild(overlay);
 
-    var video = card.querySelector('video');
+    const video = card.querySelector('video');
     if (video) {
-      video.addEventListener('play', function() {
-        card.classList.add('playing');
-      });
-      video.addEventListener('pause', function() {
-        card.classList.remove('playing');
-      });
-      video.addEventListener('ended', function() {
-        card.classList.remove('playing');
-      });
+      video.addEventListener('play', () => card.classList.add('playing'));
+      video.addEventListener('pause', () => card.classList.remove('playing'));
+      video.addEventListener('ended', () => card.classList.remove('playing'));
     }
   });
 }
 
 // ============================================
-// ANCHOR LINK NAVIGATION
+// RESIZE HANDLER
+// Re-trigger reveal animations when crossing mobile/desktop breakpoint
 // ============================================
+let wasMobile = window.innerWidth <= 768;
 
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-  anchor.addEventListener('click', function (e) {
-    const href = this.getAttribute('href');
-    if (href === '#') return;
-    
-    const target = document.querySelector(href);
-    if (target) {
-      target.style.scrollMarginTop = '100px';
-    }
-  });
-});
-
-// ============================================
-// PERFORMANCE OPTIMIZATIONS
-// ============================================
-
-// Throttle function for scroll events
-function throttle(func, limit) {
-  let inThrottle;
-  return function() {
-    const args = arguments;
-    const context = this;
-    if (!inThrottle) {
-      func.apply(context, args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
-    }
-  };
-}
-
-// Debounce function for resize events
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
-// Optimized scroll handler
-const optimizedScrollHandler = throttle(() => {
-  updateActiveNavLink();
-}, 100);
-
-// Replace scroll event listeners with optimized version
-window.removeEventListener('scroll', updateActiveNavLink);
-
-window.addEventListener('scroll', optimizedScrollHandler, { passive: true });
-
-// Lazy load videos for better performance
-const videoObserver = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      const video = entry.target;
-      if (video.dataset.src) {
-        video.src = video.dataset.src;
-        video.removeAttribute('data-src');
-      }
-      videoObserver.unobserve(video);
-    }
-  });
-}, {
-  rootMargin: '200px 0px',
-  threshold: 0.01
-});
-
-// Observe all videos for lazy loading
-document.querySelectorAll('video[data-src]').forEach(video => {
-  videoObserver.observe(video);
-});
-
-// Preload critical resources
-window.addEventListener('load', () => {
-  // Ensure we're at the top after everything loads
-  window.scrollTo(0, 0);
-});
-
-// Handle visibility change to pause animations when tab is not visible
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    // Pause non-essential animations
-    document.querySelectorAll('.reel-card').forEach(card => {
-      card.style.animationPlayState = 'paused';
-    });
-  } else {
-    // Resume animations
-    document.querySelectorAll('.reel-card').forEach(card => {
-      card.style.animationPlayState = 'running';
-    });
-  }
-});
-
-// Optimize for mobile devices
-const isMobile = window.innerWidth <= 768;
-
-if (isMobile) {
-  // Reduce animation complexity on mobile
-  document.documentElement.style.setProperty('--transition', 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)');
-  
-  // Disable some hover effects on touch devices
-  const touchMediaQuery = window.matchMedia('(hover: none)');
-  if (touchMediaQuery.matches) {
-    document.querySelectorAll('.reel-card').forEach(card => {
-      card.style.transition = 'transform 0.3s ease, box-shadow 0.3s ease';
-    });
-  }
-}
-
-// Handle resize events
 window.addEventListener('resize', debounce(() => {
-  // Recalculate any size-dependent animations
   const isNowMobile = window.innerWidth <= 768;
-  if (isNowMobile !== isMobile) {
-    // Instead of reloading, we'll handle responsive changes properly
-    // We'll trigger a refresh of the scroll reveal elements
-    const revealElements = document.querySelectorAll('.reveal, .reveal-fade, .reveal-scale');
-    revealElements.forEach(el => {
+  if (isNowMobile !== wasMobile) {
+    wasMobile = isNowMobile;
+    document.querySelectorAll('.reveal, .reveal-fade, .reveal-scale').forEach(el => {
       el.classList.remove('active');
-      // Force reflow to reset animations
       void el.offsetWidth;
       el.classList.add('active');
     });
   }
 }, 250));
 
-// Performance monitoring (optional - can be removed in production)
-if (window.performance && window.performance.mark) {
-  window.performance.mark('animations-initialized');
-}
+// Ensure we're at the top after everything loads
+window.addEventListener('load', () => {
+  window.scrollTo(0, 0);
+});
 
 // ============================================
 // VOICE OVER SECTION
 // ============================================
-
 (function() {
   'use strict';
 
-  // DOM elements
   const voGrid = document.getElementById('voiceover-grid');
   const voEmpty = document.getElementById('voiceover-empty');
   const voModal = document.getElementById('vo-modal');
@@ -905,7 +1230,6 @@ if (window.performance && window.performance.mark) {
   // ============================================
   // Helpers
   // ============================================
-
   function formatTime(sec) {
     if (!sec || isNaN(sec) || !isFinite(sec)) return '0:00';
     const m = Math.floor(sec / 60);
@@ -943,7 +1267,6 @@ if (window.performance && window.performance.mark) {
   // ============================================
   // Card Creation
   // ============================================
-
   function createVoiceOverCard(item, index) {
     const card = document.createElement('article');
     card.className = 'vo-card reveal-scale';
@@ -978,7 +1301,7 @@ if (window.performance && window.performance.mark) {
     `;
 
     card.addEventListener('click', () => openModal(card));
-    card.addEventListener('keydown', (e) => {
+    card.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         openModal(card);
@@ -991,7 +1314,6 @@ if (window.performance && window.performance.mark) {
   // ============================================
   // Load Voice Overs
   // ============================================
-
   async function loadVoiceOvers() {
     if (!voGrid) return;
 
@@ -1023,7 +1345,7 @@ if (window.performance && window.performance.mark) {
         }
       });
     } catch (err) {
-      console.error('Failed to load voice overs:', err);
+      // Failed to load voice overs
       voGrid.hidden = true;
       voEmpty.hidden = false;
       if (typeof revealObserver !== 'undefined') {
@@ -1035,11 +1357,9 @@ if (window.performance && window.performance.mark) {
   // ============================================
   // Modal
   // ============================================
-
   function openModal(card) {
     lastFocused = card;
 
-    // Set content
     voCoverImg.src = card.dataset.cover || '';
     voCoverImg.alt = card.dataset.title || '';
     voTitle.textContent = card.dataset.title || '';
@@ -1047,25 +1367,20 @@ if (window.performance && window.performance.mark) {
     voDuration.textContent = card.dataset.duration || '';
     voDesc.textContent = card.dataset.description || '';
 
-    // Reset player
     showPlayIcon();
     voCurrentTime.textContent = '0:00';
     voTotalTime.textContent = card.dataset.duration || '0:00';
     voVolumeSlider.value = 1;
 
-    // Clear waveform
     waveformBars = [];
     voCtx.clearRect(0, 0, voCanvas.width, voCanvas.height);
 
-    // Show modal
     voModal.classList.add('active');
     voModal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('modal-open');
 
-    // Load audio
     loadAudio(card.dataset.audio);
 
-    // Focus play button
     setTimeout(() => voPlayPauseBtn.focus(), 100);
   }
 
@@ -1076,32 +1391,26 @@ if (window.performance && window.performance.mark) {
     voModal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('modal-open');
 
-    // Stop audio
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
     }
 
-    // Cancel RAF
     if (rafId) {
       cancelAnimationFrame(rafId);
       rafId = null;
     }
 
-    // Revoke blob URL
     if (audioBlobUrl) {
       URL.revokeObjectURL(audioBlobUrl);
       audioBlobUrl = null;
     }
 
-    // Hide speed menu
     voSpeedMenu.hidden = true;
     voSpeedBtn.setAttribute('aria-expanded', 'false');
 
-    // Reset play icon
     showPlayIcon();
 
-    // Restore focus
     if (restoreFocus && lastFocused) {
       lastFocused.focus();
     }
@@ -1110,10 +1419,9 @@ if (window.performance && window.performance.mark) {
   // ============================================
   // Audio Loading & Waveform
   // ============================================
-
   async function loadAudio(url) {
     if (!url) {
-      console.error('No audio URL provided');
+      // No audio URL provided
       showLoading(false);
       return;
     }
@@ -1124,13 +1432,11 @@ if (window.performance && window.performance.mark) {
       const response = await fetch(url);
       const arrayBuffer = await response.arrayBuffer();
 
-      // Create blob URL for audio element (Blob constructor copies data, does not detach)
       if (audioBlobUrl) {
         URL.revokeObjectURL(audioBlobUrl);
       }
       audioBlobUrl = URL.createObjectURL(new Blob([arrayBuffer]));
 
-      // Create audio element if needed
       if (!audio) {
         audio = new Audio();
         audio.controlsList = 'nodownload';
@@ -1152,25 +1458,15 @@ if (window.performance && window.performance.mark) {
           drawWaveform();
         });
 
-        audio.addEventListener('canplay', () => {
-          showLoading(false);
-        });
-
-        audio.addEventListener('waiting', () => {
-          showLoading(true);
-        });
-
-        audio.addEventListener('playing', () => {
-          showLoading(false);
-        });
-
+        audio.addEventListener('canplay', () => showLoading(false));
+        audio.addEventListener('waiting', () => showLoading(true));
+        audio.addEventListener('playing', () => showLoading(false));
         audio.addEventListener('error', () => {
           showLoading(false);
-          console.error('Audio playback error');
+          // Audio playback error
         });
 
-        // Prevent context menu (download)
-        audio.addEventListener('contextmenu', (e) => e.preventDefault());
+        audio.addEventListener('contextmenu', e => e.preventDefault());
       }
 
       audio.src = audioBlobUrl;
@@ -1185,12 +1481,12 @@ if (window.performance && window.performance.mark) {
         const audioBuffer = await decodeAudioData(audioCtx, arrayBuffer.slice(0));
         generateWaveform(audioBuffer);
       } catch (decodeErr) {
-        console.warn('Waveform decode failed, using fallback:', decodeErr);
+        // Waveform decode failed, using fallback
         generatePseudoWaveform();
       }
 
     } catch (err) {
-      console.error('Failed to load audio:', err);
+      // Failed to load audio
       showLoading(false);
     }
   }
@@ -1279,7 +1575,6 @@ if (window.performance && window.performance.mark) {
   // ============================================
   // Player Controls
   // ============================================
-
   function togglePlay() {
     if (!audio || !audio.src) return;
 
@@ -1288,7 +1583,7 @@ if (window.performance && window.performance.mark) {
         showPauseIcon();
         startProgressLoop();
       }).catch(err => {
-        console.error('Play failed:', err);
+        // Play failed
       });
     } else {
       audio.pause();
@@ -1349,7 +1644,6 @@ if (window.performance && window.performance.mark) {
   // ============================================
   // Focus Trap
   // ============================================
-
   function getFocusableElements() {
     return Array.prototype.slice.call(voModal.querySelectorAll(
       'button:not([hidden]):not([disabled]), input:not([hidden]):not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -1381,19 +1675,13 @@ if (window.performance && window.performance.mark) {
   // ============================================
   // Event Listeners
   // ============================================
-
-  // Play/Pause
   voPlayPauseBtn.addEventListener('click', togglePlay);
-
-  // Skip buttons
   voSkipBackBtn.addEventListener('click', () => skip(-10));
   voSkipFwdBtn.addEventListener('click', () => skip(10));
-
-  // Volume
-  voVolumeSlider.addEventListener('input', (e) => setVolume(e.target.value));
+  voVolumeSlider.addEventListener('input', e => setVolume(e.target.value));
 
   // Speed control
-  voSpeedBtn.addEventListener('click', (e) => {
+  voSpeedBtn.addEventListener('click', e => {
     e.stopPropagation();
     const isExpanded = voSpeedBtn.getAttribute('aria-expanded') === 'true';
     voSpeedMenu.hidden = isExpanded;
@@ -1410,7 +1698,7 @@ if (window.performance && window.performance.mark) {
   });
 
   // Close speed menu on outside click
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', e => {
     if (!voSpeedMenu.hidden && !voSpeedBtn.contains(e.target) && !voSpeedMenu.contains(e.target)) {
       voSpeedMenu.hidden = true;
       voSpeedBtn.setAttribute('aria-expanded', 'false');
@@ -1422,12 +1710,12 @@ if (window.performance && window.performance.mark) {
   voOverlay.addEventListener('click', () => closeModal(true));
 
   // Waveform interaction (mouse)
-  voCanvas.addEventListener('mousedown', (e) => {
+  voCanvas.addEventListener('mousedown', e => {
     isDragging = true;
     seekToPosition(e.clientX);
   });
 
-  document.addEventListener('mousemove', (e) => {
+  document.addEventListener('mousemove', e => {
     if (isDragging) seekToPosition(e.clientX);
   });
 
@@ -1436,13 +1724,11 @@ if (window.performance && window.performance.mark) {
   });
 
   // Waveform interaction (touch)
-  voCanvas.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 0) {
-      seekToPosition(e.touches[0].clientX);
-    }
+  voCanvas.addEventListener('touchstart', e => {
+    if (e.touches.length > 0) seekToPosition(e.touches[0].clientX);
   }, { passive: true });
 
-  voCanvas.addEventListener('touchmove', (e) => {
+  voCanvas.addEventListener('touchmove', e => {
     if (e.touches.length > 0) {
       e.preventDefault();
       seekToPosition(e.touches[0].clientX);
@@ -1450,7 +1736,7 @@ if (window.performance && window.performance.mark) {
   }, { passive: false });
 
   // Keyboard support
-  voModal.addEventListener('keydown', (e) => {
+  voModal.addEventListener('keydown', e => {
     switch (e.key) {
       case 'Escape':
         e.preventDefault();
@@ -1495,14 +1781,12 @@ if (window.performance && window.performance.mark) {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (voModal.classList.contains('active')) {
-        drawWaveform();
-      }
+      if (voModal.classList.contains('active')) drawWaveform();
     }, 250);
   });
 
   // Stop audio when navigating away via [data-nav]
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', e => {
     const navItem = e.target.closest('[data-nav]');
     if (navItem && navItem.dataset.nav !== 'voiceover') {
       if (voModal.classList.contains('active')) {
@@ -1518,7 +1802,7 @@ if (window.performance && window.performance.mark) {
     }
   }, true); // capture phase — runs before existing nav handlers
 
-  // Pause audio when tab is hidden (battery / performance)
+  // Pause audio when tab is hidden
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && audio && !audio.paused) {
       audio.pause();
@@ -1532,40 +1816,38 @@ if (window.performance && window.performance.mark) {
 
   // Initialize
   document.addEventListener('DOMContentLoaded', loadVoiceOvers);
-
 })();
 
 // ============================================
 // CINEMATIC FULLSCREEN VIEWER
 // ============================================
-
 (function() {
   'use strict';
 
-  var viewer = document.getElementById('cinematic-viewer');
+  const viewer = document.getElementById('cinematic-viewer');
   if (!viewer) return;
 
-  var backdrop = viewer.querySelector('.cv-backdrop');
-  var closeBtn = viewer.querySelector('.cv-close');
-  var prevBtn = viewer.querySelector('.cv-prev');
-  var nextBtn = viewer.querySelector('.cv-next');
-  var videoEl = viewer.querySelector('video');
-  var tagEl = viewer.querySelector('.cv-tag');
-  var titleEl = viewer.querySelector('.cv-title');
-  var durationEl = viewer.querySelector('.cv-duration');
+  const backdrop = viewer.querySelector('.cv-backdrop');
+  const closeBtn = viewer.querySelector('.cv-close');
+  const prevBtn = viewer.querySelector('.cv-prev');
+  const nextBtn = viewer.querySelector('.cv-next');
+  const videoEl = viewer.querySelector('video');
+  const tagEl = viewer.querySelector('.cv-tag');
+  const titleEl = viewer.querySelector('.cv-title');
+  const durationEl = viewer.querySelector('.cv-duration');
 
-  var videoList = [];
-  var currentIndex = 0;
-  var lastFocused = null;
-  var touchStartX = 0;
+  let videoList = [];
+  let currentIndex = 0;
+  let lastFocused = null;
+  let touchStartX = 0;
 
   function collectVideos() {
     videoList = [];
-    document.querySelectorAll('.reel-card').forEach(function(card) {
-      var video = card.querySelector('video source');
+    document.querySelectorAll('.reel-card').forEach(card => {
+      const video = card.querySelector('video source');
       if (video && video.src) {
-        var grid = card.closest('.video-grid');
-        var panel = grid ? grid.dataset.panel : '';
+        const grid = card.closest('.video-grid');
+        const panel = grid ? grid.dataset.panel : '';
         videoList.push({
           src: video.src,
           category: categoryLabels[panel] || '',
@@ -1580,8 +1862,7 @@ if (window.performance && window.performance.mark) {
     collectVideos();
     if (videoList.length === 0) return;
 
-    // Find the index of the clicked card
-    var found = videoList.findIndex(function(item) { return item.card === card; });
+    const found = videoList.findIndex(item => item.card === card);
     currentIndex = found >= 0 ? found : 0;
 
     lastFocused = card;
@@ -1591,7 +1872,7 @@ if (window.performance && window.performance.mark) {
     document.body.classList.add('modal-open');
     document.body.style.overflow = 'hidden';
 
-    setTimeout(function() { videoEl.play().catch(function(){}); }, 300);
+    setTimeout(() => { videoEl.play().catch(() => {}); }, 300);
   }
 
   function loadVideo(index) {
@@ -1599,7 +1880,7 @@ if (window.performance && window.performance.mark) {
     if (index >= videoList.length) index = 0;
 
     currentIndex = index;
-    var item = videoList[index];
+    const item = videoList[index];
 
     videoEl.src = item.src;
     tagEl.textContent = item.category;
@@ -1607,8 +1888,8 @@ if (window.performance && window.performance.mark) {
     durationEl.textContent = '';
 
     videoEl.addEventListener('loadedmetadata', function setDur() {
-      var m = Math.floor(videoEl.duration / 60);
-      var s = Math.floor(videoEl.duration % 60);
+      const m = Math.floor(videoEl.duration / 60);
+      const s = Math.floor(videoEl.duration % 60);
       durationEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
       videoEl.removeEventListener('loadedmetadata', setDur);
     });
@@ -1628,12 +1909,12 @@ if (window.performance && window.performance.mark) {
 
   function next() {
     loadVideo(currentIndex + 1);
-    setTimeout(function() { videoEl.play().catch(function(){}); }, 200);
+    setTimeout(() => { videoEl.play().catch(() => {}); }, 200);
   }
 
   function prev() {
     loadVideo(currentIndex - 1);
-    setTimeout(function() { videoEl.play().catch(function(){}); }, 200);
+    setTimeout(() => { videoEl.play().catch(() => {}); }, 200);
   }
 
   // Close
@@ -1645,7 +1926,7 @@ if (window.performance && window.performance.mark) {
   nextBtn.addEventListener('click', next);
 
   // Keyboard
-  viewer.addEventListener('keydown', function(e) {
+  viewer.addEventListener('keydown', e => {
     switch (e.key) {
       case 'Escape': e.preventDefault(); closeViewer(); break;
       case 'ArrowLeft': e.preventDefault(); prev(); break;
@@ -1654,26 +1935,25 @@ if (window.performance && window.performance.mark) {
   });
 
   // Touch swipe
-  viewer.addEventListener('touchstart', function(e) {
+  viewer.addEventListener('touchstart', e => {
     touchStartX = e.touches[0].clientX;
   }, { passive: true });
 
-  viewer.addEventListener('touchend', function(e) {
-    var dx = e.changedTouches[0].clientX - touchStartX;
+  viewer.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
     if (Math.abs(dx) > 60) {
       if (dx > 0) prev(); else next();
     }
   }, { passive: true });
 
   // Wire up card clicks — but NOT when clicking the native video controls
-  document.addEventListener('click', function(e) {
-    var card = e.target.closest('.reel-card');
+  document.addEventListener('click', e => {
+    const card = e.target.closest('.reel-card');
     if (!card) return;
-    // If the click is on the video element itself (controls), don't open viewer
     if (e.target.tagName === 'VIDEO') return;
 
     // Only open viewer for cards in the currently active panel
-    var grid = card.closest('.video-grid');
+    const grid = card.closest('.video-grid');
     if (grid && grid.classList.contains('active')) {
       e.preventDefault();
       openViewer(card);
@@ -1681,75 +1961,10 @@ if (window.performance && window.performance.mark) {
   });
 
   // Stop viewer audio when navigating away
-  document.addEventListener('click', function(e) {
-    var navItem = e.target.closest('[data-nav]');
+  document.addEventListener('click', e => {
+    const navItem = e.target.closest('[data-nav]');
     if (navItem && viewer.classList.contains('active')) {
       closeViewer();
     }
   }, true);
-
-})();
-
-// ============================================
-// CATEGORY PAGE VIDEO CLONER
-// ============================================
-
-(function() {
-  'use strict';
-
-  var categories = [
-    { panel: 'ugc', grid: 'grid-cat-ugc' },
-    { panel: 'shoting', grid: 'grid-cat-shoting' },
-    { panel: 'stores', grid: 'grid-cat-stores' },
-    { panel: 'events', grid: 'grid-cat-events' },
-    { panel: 'services', grid: 'grid-cat-services' }
-  ];
-
-  function cloneVideos() {
-    categories.forEach(function(cat) {
-      var source = document.querySelector('.video-grid[data-panel="' + cat.panel + '"]');
-      var target = document.getElementById(cat.grid);
-      if (!source || !target) return;
-
-      target.innerHTML = '';
-      var cards = source.querySelectorAll('.reel-card');
-      cards.forEach(function(card) {
-        var clone = card.cloneNode(true);
-        // Remove reveal animation classes from clones — they cause opacity:0
-        // that the IntersectionObserver may not clear on hidden pages
-        clone.classList.remove('reveal-scale', 'reveal-delay-1', 'reveal-delay-2', 'reveal-delay-3', 'reveal-delay-4', 'reveal-delay-5');
-        target.appendChild(clone);
-
-        // Re-init loading handlers for cloned videos
-        var video = clone.querySelector('video');
-        if (video) {
-          video.addEventListener('loadstart', function() {
-            clone.classList.add('loading');
-            // Fresh fallback from actual load start, not from clone time
-            setTimeout(function() { clone.classList.remove('loading'); }, 5000);
-          });
-          video.addEventListener('loadedmetadata', function() { clone.classList.remove('loading'); });
-          video.addEventListener('loadeddata', function() { clone.classList.remove('loading'); });
-          video.addEventListener('canplay', function() { clone.classList.remove('loading'); });
-          video.addEventListener('waiting', function() { clone.classList.add('loading'); });
-          video.addEventListener('playing', function() { clone.classList.remove('loading'); });
-          // Explicitly trigger loading — cloned videos in display:none
-          // containers don't auto-load their <source> elements
-          video.load();
-          setTimeout(function() { clone.classList.remove('loading'); }, 5000);
-        }
-      });
-
-      // Enhance cloned cards with overlays
-      if (typeof enhanceReelCards === 'function') {
-        enhanceReelCards();
-      }
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', cloneVideos);
-  } else {
-    cloneVideos();
-  }
 })();
