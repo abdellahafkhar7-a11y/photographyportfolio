@@ -1,6 +1,4 @@
 User-agent: *
 Allow: /
 
-Host: https://abdellahafkhar7-a11y.github.io/photographyportfolio/
-
 Sitemap: https://abdellahafkhar7-a11y.github.io/photographyportfolio/sitemap.xml

@@ -309,7 +309,7 @@
           <div class="equipment-grid">
             <article class="equipment-card reveal-scale">
               <div class="equipment-photo">
-                <img src="" alt="Equipment photo" loading="lazy">
+                <img alt="Equipment photo" loading="lazy">
               </div>
               <div class="equipment-body">
                 <h3 class="equipment-name">—</h3>
@@ -318,7 +318,7 @@
             </article>
             <article class="equipment-card reveal-scale">
               <div class="equipment-photo">
-                <img src="" alt="Equipment photo" loading="lazy">
+                <img alt="Equipment photo" loading="lazy">
               </div>
               <div class="equipment-body">
                 <h3 class="equipment-name">—</h3>
@@ -327,7 +327,7 @@
             </article>
             <article class="equipment-card reveal-scale">
               <div class="equipment-photo">
-                <img src="" alt="Equipment photo" loading="lazy">
+                <img alt="Equipment photo" loading="lazy">
               </div>
               <div class="equipment-body">
                 <h3 class="equipment-name">—</h3>
@@ -482,6 +482,128 @@
           </div>
         </section>
       </div><!-- /page-request -->
+
+      <div class="page-view" id="page-start" data-page="start">
+        <section class="sub-page-section reveal">
+          <div class="start-hero">
+            <div class="start-hero-icon reveal-scale">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="9" y1="15" x2="15" y2="15"></line>
+                <line x1="9" y1="11" x2="15" y2="11"></line>
+              </svg>
+            </div>
+            <h2 class="sub-page-heading">Start Your Project</h2>
+            <p class="sub-page-subtitle">Tell us about your project and we'll prepare the best solution for your business.</p>
+          </div>
+
+          <div class="request-card">
+            <form id="start-form" novalidate>
+              <div class="request-form-grid">
+                <div class="form-group">
+                  <label for="start-name" class="form-label">Full Name <span class="form-required">*</span></label>
+                  <input type="text" id="start-name" name="name" class="form-input" required autocomplete="name" aria-describedby="start-err-name">
+                  <span class="form-error" id="start-err-name" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="start-phone" class="form-label">Phone Number <span class="form-required">*</span></label>
+                  <input type="tel" id="start-phone" name="phone" class="form-input" required autocomplete="tel" aria-describedby="start-err-phone">
+                  <span class="form-error" id="start-err-phone" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="start-email" class="form-label">Email Address <span class="form-required">*</span></label>
+                  <input type="email" id="start-email" name="email" class="form-input" required autocomplete="email" aria-describedby="start-err-email">
+                  <span class="form-error" id="start-err-email" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="start-company" class="form-label">Company <span class="form-optional">(Optional)</span></label>
+                  <input type="text" id="start-company" name="company" class="form-input" autocomplete="organization">
+                </div>
+
+                <div class="form-group">
+                  <label for="start-service" class="form-label">Service <span class="form-required">*</span></label>
+                  <select id="start-service" name="service" class="form-input form-select" required aria-describedby="start-err-service">
+                    <option value="" disabled selected>Select a service</option>
+                    <option value="UGC Videos">UGC Videos</option>
+                    <option value="Store Commercial">Store Commercial</option>
+                    <option value="Events">Events</option>
+                    <option value="Photography">Photography</option>
+                    <option value="Drone">Drone</option>
+                    <option value="Voice Over">Voice Over</option>
+                    <option value="Media Buyer">Media Buyer</option>
+                    <option value="Graphic Design">Graphic Design</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <span class="form-error" id="start-err-service" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="start-budget" class="form-label">Budget <span class="form-required">*</span></label>
+                  <select id="start-budget" name="budget" class="form-input form-select" required aria-describedby="start-err-budget">
+                    <option value="" disabled selected>Select a budget</option>
+                    <option value="Less than 2,000 MAD">Less than 2,000 MAD</option>
+                    <option value="2,000 – 5,000 MAD">2,000 – 5,000 MAD</option>
+                    <option value="5,000 – 10,000 MAD">5,000 – 10,000 MAD</option>
+                    <option value="More than 10,000 MAD">More than 10,000 MAD</option>
+                  </select>
+                  <span class="form-error" id="start-err-budget" role="alert"></span>
+                </div>
+
+                <div class="form-group form-group-full">
+                  <label for="start-deadline" class="form-label">Preferred Deadline</label>
+                  <input type="date" id="start-deadline" name="deadline" class="form-input" aria-describedby="start-err-deadline">
+                  <span class="form-error" id="start-err-deadline" role="alert"></span>
+                </div>
+
+                <div class="form-group form-group-full">
+                  <label for="start-description" class="form-label">Project Description <span class="form-required">*</span></label>
+                  <textarea id="start-description" name="description" class="form-input form-textarea" rows="5" required minlength="30" placeholder="Describe your project in detail (minimum 30 characters)..." aria-describedby="start-err-description start-char-counter"></textarea>
+                  <div class="form-meta-row">
+                    <span class="form-error" id="start-err-description" role="alert"></span>
+                    <span class="char-counter" id="start-char-counter">0 / 30</span>
+                  </div>
+                </div>
+
+                <div class="form-group form-group-full">
+                  <label for="start-reference" class="form-label">Reference Link <span class="form-optional">(Optional)</span></label>
+                  <input type="url" id="start-reference" name="reference" class="form-input" placeholder="Google Drive / WeTransfer / Dropbox / Figma / Pinterest / Website URL">
+                </div>
+              </div>
+
+              <div class="form-consent">
+                <label class="consent-label">
+                  <input type="checkbox" id="start-consent" class="consent-checkbox" required>
+                  <span class="consent-box" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </span>
+                  <span class="consent-text">I agree to be contacted regarding my project request.</span>
+                </label>
+                <span class="form-error" id="start-err-consent" role="alert"></span>
+              </div>
+
+              <div class="form-submit-row">
+                <button type="submit" class="button primary form-submit start-submit-btn" id="start-submit-btn">
+                  <span class="submit-text">🚀 Send via WhatsApp</span>
+                  <span class="submit-spinner" hidden></span>
+                </button>
+              </div>
+
+              <div class="form-success" id="start-form-success" hidden>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <h3>Opening WhatsApp...</h3>
+                <p>Your project details have been prepared. Complete the conversation to send your request.</p>
+              </div>
+            </form>
+          </div>
+        </section>
+      </div><!-- /page-start -->
 
       <!-- Video category pages are dynamically generated by script.js -->
     </main>

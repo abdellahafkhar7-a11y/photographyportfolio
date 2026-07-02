@@ -1118,7 +1118,7 @@ footer[id] {
   position: absolute;
   width: 20px;
   height: 20px;
-  background: rgba(59, 130, 246, 0.3);
+  background: rgba(108, 77, 255, 0.3);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -1583,7 +1583,8 @@ footer[id] {
   display: block;
 }
 
-.equipment-photo img[src=""] {
+.equipment-photo img[src=""],
+.equipment-photo img:not([src]) {
   opacity: 0;
 }
 
@@ -4715,6 +4716,132 @@ footer[id] {
   .form-input,
   .form-success,
   .upload-file-item {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ============================================
+    START YOUR PROJECT — Hero, Consent, WhatsApp
+    ============================================ */
+
+/* — Hero with icon — */
+.start-hero {
+  text-align: center;
+  margin-bottom: var(--space-8);
+}
+
+.start-hero-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--space-4);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent-primary), var(--accent-secondary));
+  border-radius: 50%;
+  color: #fff;
+  box-shadow:
+    0 4px 20px rgba(108, 77, 255, 0.4),
+    0 0 0 6px rgba(108, 77, 255, 0.12);
+  transition: transform var(--transition-bounce);
+}
+
+.start-hero-icon:hover {
+  transform: scale(1.08);
+}
+
+/* — Consent checkbox — */
+.form-consent {
+  margin-top: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.consent-label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.consent-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.consent-box {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--bg-secondary);
+  color: #fff;
+  transition: all var(--transition-smooth);
+  margin-top: 2px;
+}
+
+.consent-box svg {
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all var(--transition-fast);
+}
+
+.consent-checkbox:checked + .consent-box {
+  background: var(--gradient-cinematic);
+  border-color: var(--accent-primary);
+}
+
+.consent-checkbox:checked + .consent-box svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.consent-checkbox:focus-visible + .consent-box {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.consent-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+/* — WhatsApp submit button — */
+.start-submit-btn {
+  background: linear-gradient(135deg, #25d366 0%, #1ebe5d 50%, #128c7e 100%);
+  border-color: transparent;
+  box-shadow: 0 4px 15px rgba(37, 211, 102, 0.35);
+}
+
+.start-submit-btn:hover {
+  background: linear-gradient(135deg, #1eb858 0%, #16a34a 50%, #0f7a6e 100%);
+  box-shadow: 0 8px 25px rgba(37, 211, 102, 0.5);
+}
+
+.start-submit-btn:active {
+  transform: scale(0.97);
+  transition: transform var(--transition-fast);
+}
+
+.start-submit-btn .submit-spinner {
+  border-color: rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+}
+
+/* — Reduced motion for new elements — */
+@media (prefers-reduced-motion: reduce) {
+  .start-hero-icon,
+  .consent-box,
+  .consent-box svg,
+  .start-submit-btn {
     animation: none !important;
     transition: none !important;
   }

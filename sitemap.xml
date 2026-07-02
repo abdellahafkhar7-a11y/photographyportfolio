@@ -85,7 +85,19 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://abdellahafkhar7-a11y.github.io/photographyportfolio/equipment</loc>
+    <lastmod>2026-07-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://abdellahafkhar7-a11y.github.io/photographyportfolio/request</loc>
+    <lastmod>2026-07-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://abdellahafkhar7-a11y.github.io/photographyportfolio/start</loc>
     <lastmod>2026-07-01</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>

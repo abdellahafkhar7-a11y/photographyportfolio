@@ -182,6 +182,11 @@ function buildPageMeta() {
     desc: (sp.request && sp.request.seoDescription) || 'اطلب مشروعك من وكالة Photography Pixel — UGC، تصوير، درون، صوت، تصميم. نغطي أيت ملول، أكادير والمغرب.',
     crumb: (sp.request && sp.request.crumb) || 'Request a Project'
   };
+  meta['start'] = {
+    title: (sp.start && sp.start.seoTitle) || 'Start Your Project | Photography Pixel',
+    desc: (sp.start && sp.start.seoDescription) || 'ابدأ مشروعك مع وكالة Photography Pixel — املأ النموذج وسنرسل تفاصيلك مباشرة عبر واتساب للحصول على عرض سريع.',
+    crumb: (sp.start && sp.start.crumb) || 'Start Your Project'
+  };
 
   // Category pages (cat-{slug})
   CATEGORIES.forEach(cat => {
@@ -214,7 +219,8 @@ function applyConfigToStaticPages() {
     'page-media-buyer': 'media-buyer',
     'page-voiceover': 'voiceover',
     'page-equipment': 'equipment',
-    'page-request': 'request'
+    'page-request': 'request',
+    'page-start': 'start'
   };
 
   for (const [pageId, slug] of Object.entries(pageMap)) {
@@ -437,7 +443,12 @@ async function loadVideoCategories() {
 
   await Promise.all(CATEGORIES.map(async cat => {
     const urls = await fetchCategoryUrls(cat.txt);
-    if (urls.length === 0) return;
+    if (urls.length === 0) {
+      // Remove empty featured preview block (e.g. gallery.txt is empty)
+      const emptyPreview = document.getElementById('home-grid-' + cat.slug);
+      if (emptyPreview) emptyPreview.parentElement.remove();
+      return;
+    }
 
     renderVideoCards(urls, 'home-grid-' + cat.slug, cat.slug, 3);
     renderVideoCards(urls, 'grid-cat-' + cat.slug, cat.slug);
@@ -626,31 +637,6 @@ if (navToggle && navMenu) {
 }
 
 // ============================================
-// ACTIVE NAV LINK ON SCROLL
-// ============================================
-function updateActiveNavLink() {
-  const sections = document.querySelectorAll('section[id], main[id], footer[id]');
-  const scrollPosition = window.scrollY + 100;
-
-  sections.forEach(section => {
-    const sectionTop = section.offsetTop;
-    const sectionHeight = section.offsetHeight;
-    const sectionId = section.getAttribute('id');
-
-    if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
-      navLinks.forEach(link => {
-        link.classList.remove('active');
-        if (link.getAttribute('href') === `#${sectionId}`) {
-          link.classList.add('active');
-        }
-      });
-    }
-  });
-}
-
-window.addEventListener('scroll', throttle(updateActiveNavLink, 100), { passive: true });
-
-// ============================================
 // MENU PANEL
 // ============================================
 function closeMenu() {
@@ -728,7 +714,8 @@ const ROUTES = {
   'model': 'models',
   'contact': 'home-contact',
   'equipment': 'equipment',
-  'request': 'request'
+  'request': 'request',
+  'start': 'start'
 };
 
 // Reverse map: page name → URL path
@@ -1880,12 +1867,13 @@ window.addEventListener('load', () => {
   function collectVideos() {
     videoList = [];
     document.querySelectorAll('.reel-card').forEach(card => {
-      const video = card.querySelector('video source');
-      if (video && video.src) {
+      const source = card.querySelector('video source');
+      const src = source && (source.src || source.dataset.src);
+      if (src) {
         const grid = card.closest('.video-grid');
         const panel = grid ? grid.dataset.panel : '';
         videoList.push({
-          src: video.src,
+          src: src,
           category: categoryLabels[panel] || '',
           title: panel ? (panel.charAt(0).toUpperCase() + panel.slice(1)) : 'Project',
           card: card
@@ -2272,6 +2260,185 @@ const FORM_ENDPOINT = '';
       var errEl = document.getElementById('err-description');
       if (errEl) errEl.textContent = 'Something went wrong. Please try again.';
     }
+  });
+
+  updateCharCounter();
+})();
+
+// ============================================
+// START YOUR PROJECT — WhatsApp Form
+// Generates a formatted WhatsApp message and opens wa.me
+// ============================================
+const WHATSAPP_NUMBER = '212663493003';
+
+(function() {
+  'use strict';
+
+  var form = document.getElementById('start-form');
+  if (!form) return;
+
+  var submitBtn = document.getElementById('start-submit-btn');
+  var submitText = submitBtn.querySelector('.submit-text');
+  var submitSpinner = submitBtn.querySelector('.submit-spinner');
+  var successDiv = document.getElementById('start-form-success');
+  var descTextarea = document.getElementById('start-description');
+  var charCounter = document.getElementById('start-char-counter');
+  var consentCheckbox = document.getElementById('start-consent');
+
+  var MIN_DESC_LENGTH = 30;
+
+  // — Character Counter —
+  function updateCharCounter() {
+    var len = descTextarea.value.length;
+    charCounter.textContent = len + ' / ' + MIN_DESC_LENGTH;
+    charCounter.classList.toggle('char-warning', len > 0 && len < MIN_DESC_LENGTH);
+    charCounter.classList.toggle('char-ok', len >= MIN_DESC_LENGTH);
+  }
+
+  descTextarea.addEventListener('input', updateCharCounter);
+
+  // — Validation helpers —
+  function showError(errId, message) {
+    var el = document.getElementById(errId);
+    if (el) el.textContent = message;
+  }
+
+  function clearError(errId) {
+    var el = document.getElementById(errId);
+    if (el) el.textContent = '';
+  }
+
+  function validateField(field) {
+    var id = field.id;
+    var val = field.value.trim();
+
+    switch (id) {
+      case 'start-name':
+        if (!val) { showError('start-err-name', 'Please enter your full name.'); return false; }
+        if (val.length < 2) { showError('start-err-name', 'Name must be at least 2 characters.'); return false; }
+        clearError('start-err-name'); return true;
+
+      case 'start-phone':
+        if (!val) { showError('start-err-phone', 'Please enter your phone number.'); return false; }
+        if (!/^[+]?[\d\s\-()]{6,20}$/.test(val)) { showError('start-err-phone', 'Please enter a valid phone number.'); return false; }
+        clearError('start-err-phone'); return true;
+
+      case 'start-email':
+        if (!val) { showError('start-err-email', 'Please enter your email address.'); return false; }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { showError('start-err-email', 'Please enter a valid email address.'); return false; }
+        clearError('start-err-email'); return true;
+
+      case 'start-service':
+        if (!val) { showError('start-err-service', 'Please select a service.'); return false; }
+        clearError('start-err-service'); return true;
+
+      case 'start-budget':
+        if (!val) { showError('start-err-budget', 'Please select a budget range.'); return false; }
+        clearError('start-err-budget'); return true;
+
+      case 'start-description':
+        if (!val) { showError('start-err-description', 'Please describe your project.'); return false; }
+        if (val.length < MIN_DESC_LENGTH) { showError('start-err-description', 'Description must be at least ' + MIN_DESC_LENGTH + ' characters.'); return false; }
+        clearError('start-err-description'); return true;
+    }
+    return true;
+  }
+
+  // Validate on blur + clear on input
+  form.querySelectorAll('.form-input[required]').forEach(function(field) {
+    field.addEventListener('blur', function() { validateField(field); });
+    field.addEventListener('input', function() {
+      if (field.classList.contains('form-error-input')) validateField(field);
+    });
+  });
+
+  // — Build WhatsApp Message —
+  function buildWhatsAppMessage() {
+    var name = document.getElementById('start-name').value.trim();
+    var phone = document.getElementById('start-phone').value.trim();
+    var email = document.getElementById('start-email').value.trim();
+    var company = document.getElementById('start-company').value.trim();
+    var service = document.getElementById('start-service').value;
+    var budget = document.getElementById('start-budget').value;
+    var deadline = document.getElementById('start-deadline').value;
+    var reference = document.getElementById('start-reference').value.trim();
+    var description = document.getElementById('start-description').value.trim();
+
+    var msg = '';
+    msg += '━━━━━━━━━━━━━━━━━━━━━━\n';
+    msg += '📋 NEW PROJECT REQUEST\n';
+    msg += '━━━━━━━━━━━━━━━━━━━━━━\n\n';
+    msg += '👤 Full Name\n' + name + '\n\n';
+    msg += '📱 Phone\n' + phone + '\n\n';
+    msg += '📧 Email\n' + email + '\n\n';
+    msg += '🏢 Company\n' + (company || '—') + '\n\n';
+    msg += '🎬 Service\n' + service + '\n\n';
+    msg += '💰 Budget\n' + budget + '\n\n';
+    msg += '📅 Preferred Deadline\n' + (deadline || '—') + '\n\n';
+    msg += '🔗 Reference Link\n' + (reference || '—') + '\n\n';
+    msg += '📝 Project Description\n' + description + '\n\n';
+    msg += '━━━━━━━━━━━━━━━━━━━━━━';
+
+    return msg;
+  }
+
+  // — Form Submission —
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // Validate all required fields
+    var fields = form.querySelectorAll('.form-input[required]');
+    var isValid = true;
+    fields.forEach(function(field) {
+      if (!validateField(field)) {
+        field.classList.add('form-error-input');
+        isValid = false;
+      } else {
+        field.classList.remove('form-error-input');
+      }
+    });
+
+    // Validate consent checkbox
+    if (!consentCheckbox.checked) {
+      showError('start-err-consent', 'Please agree to be contacted.');
+      isValid = false;
+    } else {
+      clearError('start-err-consent');
+    }
+
+    if (!isValid) {
+      var firstError = form.querySelector('.form-error-input') || form.querySelector('.form-error:not(:empty)');
+      if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // Loading state
+    submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+    submitText.textContent = 'Preparing...';
+    submitSpinner.hidden = false;
+
+    // Build message and open WhatsApp
+    setTimeout(function() {
+      var message = buildWhatsAppMessage();
+      var waUrl = 'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(message);
+
+      // Show success
+      form.style.display = 'none';
+      successDiv.hidden = false;
+      successDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // Open WhatsApp
+      window.open(waUrl, '_blank');
+
+      // Reset button after 1s
+      setTimeout(function() {
+        submitBtn.classList.remove('loading');
+        submitBtn.disabled = false;
+        submitText.textContent = '🚀 Send via WhatsApp';
+        submitSpinner.hidden = true;
+      }, 1000);
+    }, 600);
   });
 
   updateCharCounter();
