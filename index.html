@@ -16,6 +16,27 @@
     <link rel="dns-prefetch" href="https://pub-534c13f1f66d439aa28b4a49e34c796f.r2.dev">
     <link rel="preconnect" href="https://pub-534c13f1f66d439aa28b4a49e34c796f.r2.dev" crossorigin>
 
+    <!-- Splash Screen: first-visit check (runs before paint) -->
+    <script>
+      (function() {
+        var skip = false;
+        try {
+          skip = !!(localStorage.getItem('pp_splash_seen') || sessionStorage.getItem('pp_splash_session'));
+        } catch(e) { skip = true; }
+        if (skip) {
+          document.documentElement.classList.add('splash-skip');
+        } else {
+          document.documentElement.classList.add('splash-active');
+          try { sessionStorage.setItem('pp_splash_session', '1'); } catch(e) {}
+        }
+      })();
+    </script>
+    <style>
+      .splash-screen{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#fff}
+      html.splash-skip .splash-screen{display:none!important}
+      html.splash-active{overflow:hidden}
+    </style>
+
     <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Photography Pixel">
@@ -111,6 +132,12 @@
     </script>
   </head>
   <body>
+    <!-- Splash Screen -->
+    <div class="splash-screen" id="splash-screen" aria-hidden="true">
+      <img src="صور/Pixel Photography 3d logo.png" alt="Photography Pixel" class="splash-logo" width="120" height="120">
+    </div>
+    <noscript><style>.splash-screen{display:none!important}html.splash-active{overflow:auto}</style></noscript>
+
     <div class="bg-glow bg-glow-1" aria-hidden="true"></div>
     <div class="bg-glow bg-glow-2" aria-hidden="true"></div>
     <a href="#top" class="skip-link">انتقل إلى المحتوى الرئيسي</a>
@@ -340,6 +367,122 @@
         </section>
       </div><!-- /page-voiceover -->
 
+      <div class="page-view" id="page-request" data-page="request">
+        <section class="sub-page-section reveal">
+          <h2 class="sub-page-heading">Request a Project</h2>
+          <p class="sub-page-subtitle">Tell us about your project and we'll get back to you as soon as possible.</p>
+
+          <div class="request-card">
+            <form id="request-form" novalidate>
+              <div class="request-form-grid">
+                <div class="form-group">
+                  <label for="req-name" class="form-label">Full Name <span class="form-required">*</span></label>
+                  <input type="text" id="req-name" name="name" class="form-input" required autocomplete="name" aria-describedby="err-name">
+                  <span class="form-error" id="err-name" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="req-phone" class="form-label">Phone Number <span class="form-required">*</span></label>
+                  <input type="tel" id="req-phone" name="phone" class="form-input" required autocomplete="tel" aria-describedby="err-phone">
+                  <span class="form-error" id="err-phone" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="req-email" class="form-label">Email Address <span class="form-required">*</span></label>
+                  <input type="email" id="req-email" name="email" class="form-input" required autocomplete="email" aria-describedby="err-email">
+                  <span class="form-error" id="err-email" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="req-company" class="form-label">Company <span class="form-optional">(Optional)</span></label>
+                  <input type="text" id="req-company" name="company" class="form-input" autocomplete="organization">
+                </div>
+
+                <div class="form-group">
+                  <label for="req-service" class="form-label">Service <span class="form-required">*</span></label>
+                  <select id="req-service" name="service" class="form-input form-select" required aria-describedby="err-service">
+                    <option value="" disabled selected>Select a service</option>
+                    <option value="UGC Videos">UGC Videos</option>
+                    <option value="Store Commercial">Store Commercial</option>
+                    <option value="Events">Events</option>
+                    <option value="Photography">Photography</option>
+                    <option value="Drone">Drone</option>
+                    <option value="Voice Over">Voice Over</option>
+                    <option value="Media Buyer">Media Buyer</option>
+                    <option value="Graphic Design">Graphic Design</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <span class="form-error" id="err-service" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="req-budget" class="form-label">Budget <span class="form-required">*</span></label>
+                  <select id="req-budget" name="budget" class="form-input form-select" required aria-describedby="err-budget">
+                    <option value="" disabled selected>Select a budget</option>
+                    <option value="Less than 2,000 MAD">Less than 2,000 MAD</option>
+                    <option value="2,000 - 5,000 MAD">2,000 - 5,000 MAD</option>
+                    <option value="5,000 - 10,000 MAD">5,000 - 10,000 MAD</option>
+                    <option value="More than 10,000 MAD">More than 10,000 MAD</option>
+                  </select>
+                  <span class="form-error" id="err-budget" role="alert"></span>
+                </div>
+
+                <div class="form-group">
+                  <label for="req-deadline" class="form-label">Preferred Deadline <span class="form-required">*</span></label>
+                  <input type="date" id="req-deadline" name="deadline" class="form-input" required aria-describedby="err-deadline">
+                  <span class="form-error" id="err-deadline" role="alert"></span>
+                </div>
+
+                <div class="form-group form-group-full">
+                  <label for="req-description" class="form-label">Project Description <span class="form-required">*</span></label>
+                  <textarea id="req-description" name="description" class="form-input form-textarea" rows="5" required minlength="30" placeholder="Describe your project in detail (minimum 30 characters)..." aria-describedby="err-description char-counter"></textarea>
+                  <div class="form-meta-row">
+                    <span class="form-error" id="err-description" role="alert"></span>
+                    <span class="char-counter" id="char-counter">0 / 30</span>
+                  </div>
+                </div>
+
+                <div class="form-group form-group-full">
+                  <label for="req-reference" class="form-label">Reference Link <span class="form-optional">(Optional)</span></label>
+                  <input type="url" id="req-reference" name="reference" class="form-input" placeholder="https://example.com/reference">
+                </div>
+
+                <div class="form-group form-group-full">
+                  <label class="form-label">File Upload <span class="form-optional">(Optional)</span></label>
+                  <div class="upload-zone" id="upload-zone" tabindex="0" role="button" aria-label="Upload files by clicking or dragging">
+                    <input type="file" id="req-file" name="file" class="upload-input" accept="image/*,.pdf,.zip" multiple>
+                    <svg class="upload-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p class="upload-text">Drag &amp; drop files here or click to browse</p>
+                    <p class="upload-hint">Images, PDF, ZIP — Max 20MB</p>
+                  </div>
+                  <div class="upload-files" id="upload-files" aria-live="polite"></div>
+                </div>
+              </div>
+
+              <div class="form-submit-row">
+                <button type="submit" class="button primary form-submit" id="submit-btn">
+                  <span class="submit-text">Send Request</span>
+                  <span class="submit-spinner" hidden></span>
+                </button>
+              </div>
+
+              <div class="form-success" id="form-success" hidden>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <h3>Your request has been sent successfully.</h3>
+                <p>We'll get back to you as soon as possible.</p>
+              </div>
+            </form>
+          </div>
+        </section>
+      </div><!-- /page-request -->
+
       <!-- Video category pages are dynamically generated by script.js -->
     </main>
 
@@ -360,6 +503,7 @@
           <a href="/media-buyer" class="footer-link" data-nav="media-buyer">Media Buyer</a>
           <a href="#" class="footer-link" data-nav="equipment">معداتنا</a>
           <a href="/voice-over" class="footer-link" data-nav="voiceover">Voice Over</a>
+          <a href="/request" class="footer-link" data-nav="request">Request a Project</a>
           <a href="/contact" class="footer-link" data-nav="home-contact">تواصل معنا</a>
         </div>
 
@@ -635,6 +779,17 @@
               </svg>
             </div>
             <span>تواصل معنا</span>
+          </a>
+          <a href="/request" class="menu-item" data-nav="request">
+            <div class="menu-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="9" y1="15" x2="15" y2="15"></line>
+                <line x1="9" y1="11" x2="15" y2="11"></line>
+              </svg>
+            </div>
+            <span>Request a Project</span>
           </a>
           <a href="https://wa.me/212663493003" target="_blank" rel="noreferrer" class="menu-item">
             <div class="menu-icon whatsapp">

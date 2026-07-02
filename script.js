@@ -1,4 +1,33 @@
 // ============================================
+// SPLASH SCREEN — First-visit only
+// Runs immediately (defer guarantees DOM is parsed)
+// ============================================
+(function() {
+  if (document.documentElement.classList.contains('splash-skip')) {
+    var s = document.getElementById('splash-screen');
+    if (s) s.remove();
+    return;
+  }
+
+  try { localStorage.setItem('pp_splash_seen', '1'); } catch(e) {}
+
+  var splash = document.getElementById('splash-screen');
+  if (!splash) {
+    document.documentElement.classList.remove('splash-active');
+    return;
+  }
+
+  // Fade out after 1.5s, remove from DOM after transition
+  setTimeout(function() {
+    splash.classList.add('splash-hide');
+    setTimeout(function() {
+      splash.remove();
+      document.documentElement.classList.remove('splash-active');
+    }, 500);
+  }, 1500);
+})();
+
+// ============================================
 // SCROLL RESTORATION
 // Prevent browser from restoring scroll position on reload
 // ============================================
@@ -148,6 +177,11 @@ function buildPageMeta() {
     desc: (sp.equipment && sp.equipment.seoDescription) || 'تعرف على معدات الاستوديو الاحترافية المستخدمة في وكالة Photography Pixel.',
     crumb: (sp.equipment && sp.equipment.crumb) || 'Equipment'
   };
+  meta['request'] = {
+    title: (sp.request && sp.request.seoTitle) || 'Request a Project | Photography Pixel',
+    desc: (sp.request && sp.request.seoDescription) || 'اطلب مشروعك من وكالة Photography Pixel — UGC، تصوير، درون، صوت، تصميم. نغطي أيت ملول، أكادير والمغرب.',
+    crumb: (sp.request && sp.request.crumb) || 'Request a Project'
+  };
 
   // Category pages (cat-{slug})
   CATEGORIES.forEach(cat => {
@@ -179,7 +213,8 @@ function applyConfigToStaticPages() {
     'page-models': 'models',
     'page-media-buyer': 'media-buyer',
     'page-voiceover': 'voiceover',
-    'page-equipment': 'equipment'
+    'page-equipment': 'equipment',
+    'page-request': 'request'
   };
 
   for (const [pageId, slug] of Object.entries(pageMap)) {
@@ -692,7 +727,8 @@ const ROUTES = {
   'media-buyer': 'media-buyer',
   'model': 'models',
   'contact': 'home-contact',
-  'equipment': 'equipment'
+  'equipment': 'equipment',
+  'request': 'request'
 };
 
 // Reverse map: page name → URL path
@@ -1967,4 +2003,276 @@ window.addEventListener('load', () => {
       closeViewer();
     }
   }, true);
+})();
+
+// ============================================
+// PREMIUM IMAGE FADE-IN
+// Fades in images smoothly after load (no layout shift)
+// Handles existing + dynamically created images via MutationObserver
+// ============================================
+(function() {
+  function fadeIn(img) {
+    if (!img.src || img.src === '') return;
+    if (img.hasAttribute('fetchpriority')) return;
+    if (img.classList.contains('splash-logo')) return;
+    if (img.classList.contains('pp-img-fade')) return;
+
+    img.classList.add('pp-img-fade');
+
+    if (img.complete && img.naturalWidth > 0) {
+      requestAnimationFrame(() => img.classList.add('pp-img-loaded'));
+    } else {
+      img.addEventListener('load', () => img.classList.add('pp-img-loaded'), { once: true });
+      img.addEventListener('error', () => img.classList.add('pp-img-loaded'), { once: true });
+    }
+  }
+
+  function processImages(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('img').forEach(fadeIn);
+  }
+
+  // Process existing images
+  processImages(document);
+
+  // Watch for dynamically added images (model cards, buyer cards, VO cards)
+  const imgObserver = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+      mutation.addedNodes.forEach(node => {
+        if (node.nodeType !== 1) return;
+        if (node.tagName === 'IMG') {
+          fadeIn(node);
+        } else if (node.querySelectorAll) {
+          processImages(node);
+        }
+      });
+    });
+  });
+
+  imgObserver.observe(document.body, { childList: true, subtree: true });
+})();
+
+// ============================================
+// REQUEST A PROJECT — Form Validation & Submission
+// To connect a real backend, set FORM_ENDPOINT to your URL
+// Works with: Formspree, Cloudflare Workers, Resend, or any POST endpoint
+// Leave empty for simulation mode (shows success without sending)
+// ============================================
+const FORM_ENDPOINT = '';
+
+(function() {
+  'use strict';
+
+  const form = document.getElementById('request-form');
+  if (!form) return;
+
+  const submitBtn = document.getElementById('submit-btn');
+  const submitText = submitBtn.querySelector('.submit-text');
+  const submitSpinner = submitBtn.querySelector('.submit-spinner');
+  const successDiv = document.getElementById('form-success');
+  const descTextarea = document.getElementById('req-description');
+  const charCounter = document.getElementById('char-counter');
+  const uploadZone = document.getElementById('upload-zone');
+  const fileInput = document.getElementById('req-file');
+  const fileListDiv = document.getElementById('upload-files');
+
+  const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+  const MIN_DESC_LENGTH = 30;
+  let uploadedFiles = [];
+
+  // — Character Counter —
+  function updateCharCounter() {
+    var len = descTextarea.value.length;
+    charCounter.textContent = len + ' / ' + MIN_DESC_LENGTH;
+    charCounter.classList.toggle('char-warning', len > 0 && len < MIN_DESC_LENGTH);
+    charCounter.classList.toggle('char-ok', len >= MIN_DESC_LENGTH);
+  }
+
+  descTextarea.addEventListener('input', updateCharCounter);
+
+  // — Field Validation —
+  function showError(field, errId, message) {
+    var errEl = document.getElementById(errId);
+    if (errEl) errEl.textContent = message;
+    field.classList.add('form-error-input');
+  }
+
+  function clearError(field, errId) {
+    var errEl = document.getElementById(errId);
+    if (errEl) errEl.textContent = '';
+    field.classList.remove('form-error-input');
+  }
+
+  function validateField(field) {
+    var id = field.id;
+    var val = field.value.trim();
+
+    switch (id) {
+      case 'req-name':
+        if (!val) { showError(field, 'err-name', 'Please enter your full name.'); return false; }
+        if (val.length < 2) { showError(field, 'err-name', 'Name must be at least 2 characters.'); return false; }
+        clearError(field, 'err-name'); return true;
+
+      case 'req-phone':
+        if (!val) { showError(field, 'err-phone', 'Please enter your phone number.'); return false; }
+        if (!/^[+]?[\d\s\-()]{6,20}$/.test(val)) { showError(field, 'err-phone', 'Please enter a valid phone number.'); return false; }
+        clearError(field, 'err-phone'); return true;
+
+      case 'req-email':
+        if (!val) { showError(field, 'err-email', 'Please enter your email address.'); return false; }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { showError(field, 'err-email', 'Please enter a valid email address.'); return false; }
+        clearError(field, 'err-email'); return true;
+
+      case 'req-service':
+        if (!val) { showError(field, 'err-service', 'Please select a service.'); return false; }
+        clearError(field, 'err-service'); return true;
+
+      case 'req-budget':
+        if (!val) { showError(field, 'err-budget', 'Please select a budget range.'); return false; }
+        clearError(field, 'err-budget'); return true;
+
+      case 'req-deadline':
+        if (!val) { showError(field, 'err-deadline', 'Please select a preferred deadline.'); return false; }
+        var selected = new Date(val);
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (selected < today) { showError(field, 'err-deadline', 'Deadline cannot be in the past.'); return false; }
+        clearError(field, 'err-deadline'); return true;
+
+      case 'req-description':
+        if (!val) { showError(field, 'err-description', 'Please describe your project.'); return false; }
+        if (val.length < MIN_DESC_LENGTH) { showError(field, 'err-description', 'Description must be at least ' + MIN_DESC_LENGTH + ' characters.'); return false; }
+        clearError(field, 'err-description'); return true;
+    }
+    return true;
+  }
+
+  // Validate on blur
+  form.querySelectorAll('.form-input[required]').forEach(function(field) {
+    field.addEventListener('blur', function() { validateField(field); });
+    field.addEventListener('input', function() {
+      if (field.classList.contains('form-error-input')) validateField(field);
+    });
+  });
+
+  // — Drag & Drop —
+  function handleFiles(files) {
+    Array.from(files).forEach(function(file) {
+      if (file.size > MAX_FILE_SIZE) return;
+      if (uploadedFiles.some(function(f) { return f.name === file.name && f.size === file.size; })) return;
+      uploadedFiles.push(file);
+      renderFileList();
+    });
+  }
+
+  function renderFileList() {
+    fileListDiv.innerHTML = '';
+    uploadedFiles.forEach(function(file, index) {
+      var item = document.createElement('div');
+      item.className = 'upload-file-item';
+      item.innerHTML =
+        '<span class="file-name">' + file.name + '</span>' +
+        '<span class="file-size">' + formatSize(file.size) + '</span>' +
+        '<button type="button" class="file-remove" aria-label="Remove file">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+        '</button>';
+      item.querySelector('.file-remove').addEventListener('click', function() {
+        uploadedFiles.splice(index, 1);
+        renderFileList();
+      });
+      fileListDiv.appendChild(item);
+    });
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  uploadZone.addEventListener('click', function(e) {
+    if (e.target === fileInput) return;
+    fileInput.click();
+  });
+
+  uploadZone.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+
+  fileInput.addEventListener('change', function() {
+    handleFiles(fileInput.files);
+    fileInput.value = '';
+  });
+
+  uploadZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+  });
+
+  uploadZone.addEventListener('dragleave', function() {
+    uploadZone.classList.remove('dragover');
+  });
+
+  uploadZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  // — Form Submission —
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    var fields = form.querySelectorAll('.form-input[required]');
+    var isValid = true;
+    fields.forEach(function(field) {
+      if (!validateField(field)) isValid = false;
+    });
+
+    if (!isValid) {
+      var firstError = form.querySelector('.form-error-input');
+      if (firstError) firstError.focus();
+      return;
+    }
+
+    // Loading state
+    submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+    submitText.textContent = 'Sending...';
+    submitSpinner.hidden = false;
+
+    try {
+      if (FORM_ENDPOINT) {
+        var formData = new FormData(form);
+        uploadedFiles.forEach(function(file) {
+          formData.append('files', file);
+        });
+        var response = await fetch(FORM_ENDPOINT, {
+          method: 'POST',
+          body: formData,
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Network response was not ok');
+      } else {
+        await new Promise(function(resolve) { setTimeout(resolve, 1200); });
+      }
+
+      // Success
+      form.style.display = 'none';
+      successDiv.hidden = false;
+      successDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (err) {
+      submitBtn.classList.remove('loading');
+      submitBtn.disabled = false;
+      submitText.textContent = 'Send Request';
+      submitSpinner.hidden = true;
+      var errEl = document.getElementById('err-description');
+      if (errEl) errEl.textContent = 'Something went wrong. Please try again.';
+    }
+  });
+
+  updateCharCounter();
 })();
