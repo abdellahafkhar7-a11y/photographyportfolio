@@ -22,25 +22,11 @@ const menuBtn = document.querySelector('#menu-btn');
 const menuPanel = document.querySelector('#menu-panel');
 const menuClose = document.querySelector('#menu-close');
 const menuItems = document.querySelectorAll('.menu-item');
-const pageViews = document.querySelectorAll('.page-view');
 let navItems = Array.from(document.querySelectorAll('[data-nav]'));
 
 // ============================================
 // UTILITIES
 // ============================================
-function throttle(func, limit) {
-  let inThrottle;
-  return function() {
-    const args = arguments;
-    const context = this;
-    if (!inThrottle) {
-      func.apply(context, args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
-    }
-  };
-}
-
 function debounce(func, wait) {
   let timeout;
   return function(...args) {
@@ -83,7 +69,7 @@ const CATEGORIES = [
   { slug: 'events',   label: 'Events',    txt: 'events.txt',   route: 'events',      icon: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line>' },
   { slug: 'services', label: 'Services',  txt: 'services.txt',  route: 'services',    icon: '<path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6L12 2z"></path>' },
   { slug: 'gallery',  label: 'Gallery',   txt: 'gallery.txt',  route: 'gallery',     icon: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>', expanded: true },
-  { slug: 'drone',    label: 'Drone',     txt: 'drone.txt',     route: 'drone',       icon: '<path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.4-.1.9.3 1.1L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.2.4.7.5 1.1.3l.5-.2c.4-.3.6-.7.5-1.2z"></path>' }
+  { slug: 'drone',    label: 'Locations', txt: 'drone.txt',     route: 'drone',       icon: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle>' }
 ];
 
 // Build categoryLabels from CATEGORIES
@@ -821,6 +807,9 @@ function showPage(pageName) {
   const targetPage = document.getElementById('page-' + pageName);
   if (targetPage) {
     targetPage.classList.add('active');
+  } else if (pageName.indexOf('home') === 0) {
+    const homePage = document.getElementById('page-home');
+    if (homePage) homePage.classList.add('active');
   }
 
   // Update bottom nav active states
@@ -841,12 +830,6 @@ function showPage(pageName) {
 
   // Handle scroll targets for home page
   if (pageName === 'home' || pageName.indexOf('home') === 0) {
-    const homePage = document.getElementById('page-home');
-    if (homePage && !homePage.classList.contains('active')) {
-      pageViews.forEach(pv => pv.classList.remove('active'));
-      homePage.classList.add('active');
-    }
-
     if (pageName === 'home-portfolio') {
       setTimeout(() => {
         const portfolio = document.getElementById('portfolio');
@@ -881,20 +864,17 @@ function showPage(pageName) {
   }
 }
 
-// Attach click handlers to all [data-nav] elements
+// Bind static nav items immediately (dynamic items bound in ensureCategoryContainers)
 navItems.forEach(item => {
   if (item.id === 'menu-btn') return;
-
+  if (item._routerBound) return;
+  item._routerBound = true;
   item.addEventListener('click', function(e) {
     const nav = this.dataset.nav;
     if (!nav) return;
-
     e.preventDefault();
     navigateTo(nav);
-
-    if (menuPanel && menuPanel.classList.contains('active')) {
-      closeMenu();
-    }
+    if (menuPanel && menuPanel.classList.contains('active')) closeMenu();
   });
 });
 
@@ -1140,24 +1120,6 @@ function enhanceReelCards() {
     }
   });
 }
-
-// ============================================
-// RESIZE HANDLER
-// Re-trigger reveal animations when crossing mobile/desktop breakpoint
-// ============================================
-let wasMobile = window.innerWidth <= 768;
-
-window.addEventListener('resize', debounce(() => {
-  const isNowMobile = window.innerWidth <= 768;
-  if (isNowMobile !== wasMobile) {
-    wasMobile = isNowMobile;
-    document.querySelectorAll('.reveal, .reveal-fade, .reveal-scale').forEach(el => {
-      el.classList.remove('active');
-      void el.offsetWidth;
-      el.classList.add('active');
-    });
-  }
-}, 250));
 
 // Ensure we're at the top after everything loads
 window.addEventListener('load', () => {
