@@ -214,7 +214,7 @@ function createReelCard(url) {
   const card = document.createElement('article');
   card.className = 'reel-card';
   card.innerHTML =
-    '<video controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="metadata">' +
+    '<video controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="metadata">' +
       '<source data-src="' + url + '" type="video/mp4">' +
     '</video>';
   return card;
@@ -1889,11 +1889,10 @@ window.addEventListener('load', () => {
     }
   }, { passive: true });
 
-  // Wire up card clicks — but NOT when clicking the native video controls
+  // Wire up card clicks — clicking anywhere on the card opens the viewer
   document.addEventListener('click', e => {
     const card = e.target.closest('.reel-card');
     if (!card) return;
-    if (e.target.tagName === 'VIDEO') return;
 
     // Only open viewer for cards in the currently active panel
     const grid = card.closest('.video-grid');
