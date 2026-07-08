@@ -313,7 +313,7 @@ function ensureCategoryContainers() {
       preview.innerHTML =
         '<h3 class="featured-preview-title">' + getConfig(slug, 'title', cat.label) + '</h3>' +
         '<div class="video-grid active" data-panel="' + slug + '" id="home-grid-' + slug + '"></div>' +
-        '<a href="/' + cat.route + '" class="view-all-btn" data-nav="cat-' + slug + '">' + getConfig(slug, 'buttonLabel', 'View All →') + '</a>';
+        '<a href="/' + cat.route + '" class="view-all-btn" data-nav="cat-' + slug + '">' + getConfig(slug, 'buttonLabel', 'عرض المزيد') + '</a>';
       portfolioShell.appendChild(preview);
     }
 

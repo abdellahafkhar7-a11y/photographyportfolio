@@ -499,7 +499,9 @@ footer[id] {
 .profile-title-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
+  flex-direction: row-reverse;
 }
 
 .verified-badge {
@@ -842,6 +844,7 @@ footer[id] {
   margin-bottom: var(--space-10);
   content-visibility: auto;
   contain-intrinsic-size: auto 400px;
+  text-align: center;
 }
 
 .featured-preview-title {
@@ -852,7 +855,7 @@ footer[id] {
   padding: 0 var(--space-4);
   letter-spacing: -0.02em;
   position: relative;
-  padding-right: var(--space-5);
+  text-align: center;
 }
 
 .featured-preview-title::before {
@@ -970,7 +973,6 @@ footer[id] {
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-4);
-  margin-right: var(--space-4);
   padding: var(--space-2) var(--space-5);
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
