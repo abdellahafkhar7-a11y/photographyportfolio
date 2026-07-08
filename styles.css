@@ -371,6 +371,7 @@ footer[id] {
 
 .profile-card {
   overflow: hidden;
+  max-width: 100%;
 }
 
 .portfolio-shell {
@@ -385,10 +386,14 @@ footer[id] {
   align-items: flex-end;
   justify-content: flex-end;
   width: 100%;
+  max-width: 100%;
   min-height: 320px;
   padding: var(--space-7);
   color: #fff;
-  background: url("صور/Pixel Photography logo 3d.png") center / cover no-repeat;
+  background-image: url("صور/Pixel Photography logo 3d.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border: 0;
   cursor: zoom-in;
   position: relative;
