@@ -1810,6 +1810,7 @@ footer[id] {
   display: block;
   max-width: min(1100px, 96vw);
   max-height: 86vh;
+  max-height: 86dvh;
   object-fit: contain;
   border-radius: var(--radius-2xl);
   box-shadow: 
@@ -2676,6 +2677,7 @@ footer[id] {
 
   .nav-menu {
     max-height: 80vh;
+    max-height: 80dvh;
     overflow-y: auto;
   }
 
@@ -3386,6 +3388,7 @@ footer[id] {
 .cv-video-wrapper {
   width: 100%;
   max-height: 80vh;
+  max-height: 80dvh;
   border-radius: var(--radius-2xl);
   overflow: hidden;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(108, 77, 255, 0.2);
@@ -3396,6 +3399,7 @@ footer[id] {
   width: 100%;
   height: auto;
   max-height: 80vh;
+  max-height: 80dvh;
   object-fit: contain;
   display: block;
   border-radius: var(--radius-2xl);
@@ -3447,6 +3451,7 @@ footer[id] {
 
   .cv-video-wrapper {
     max-height: 70vh;
+    max-height: 70dvh;
   }
 }
 
@@ -3465,6 +3470,7 @@ footer[id] {
 
   .cv-video-wrapper video {
     max-height: 65vh;
+    max-height: 65dvh;
   }
 }
 
@@ -3742,6 +3748,7 @@ footer[id] {
   max-width: 560px;
   width: 100%;
   max-height: calc(100vh - var(--space-10));
+  max-height: calc(100dvh - var(--space-10));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-shadow: var(--shadow-2xl);
