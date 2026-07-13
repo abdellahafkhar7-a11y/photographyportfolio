@@ -21,7 +21,7 @@
     "available": true,
     "description": "—"
   },
- {
+  {
     "name": "حسناء",
     "photo": "assets/models/model hasna.JPG",
     "age": "",
@@ -32,7 +32,7 @@
     "available": true,
     "description": "—"
   },
-   {
+  {
     "name": "مريم",
     "photo": "assets/models/maryam hawara.png",
     "age": "",
@@ -43,7 +43,7 @@
     "available": true,
     "description": "—"
   },
-     {
+  {
     "name": "يوسف",
     "photo": "assets/models/yousef.jpg",
     "age": "",
@@ -54,7 +54,7 @@
     "available": true,
     "description": "—"
   },
-     {
+  {
     "name": "خولود",
     "photo": "assets/models/kholoud.jpg",
     "age": "",
@@ -65,7 +65,7 @@
     "available": true,
     "description": "—"
   },
-     {
+  {
     "name": "كوتر",
     "photo": "assets/models/كوتر.png",
     "age": "",
@@ -76,5 +76,4 @@
     "available": true,
     "description": "—"
   }
-  
 ]

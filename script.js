@@ -729,7 +729,7 @@ window.addEventListener('popstate', handleRoute);
 // ============================================
 // DYNAMIC SEO META UPDATES
 // ============================================
-const BASE_URL = 'https://abdellahafkhar7-a11y.github.io/photographyportfolio';
+const BASE_URL = 'https://photographypixell.com';
 const DEFAULT_TITLE = 'Photography Pixel | وكالة تصوير وتسويق رقمي في أيت ملول - أكادير';
 const DEFAULT_DESC = 'Photography Pixel: وكالة تصوير وتسويق رقمي متخصصة في صناعة المحتوى، تصوير المنتجات، المحلات التجارية، فيديوهات UGC والأعراس في أيت ملول - أكادير.';
 

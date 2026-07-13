@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://abdellahafkhar7-a11y.github.io/photographyportfolio/sitemap.xml
+Sitemap: https://photographypixell.com/sitemap.xml
