@@ -64,6 +64,17 @@
     "experience": " ",
     "available": true,
     "description": "—"
+  },
+     {
+    "name": "كوتر",
+    "photo": "assets/models/كوتر.png",
+    "age": "",
+    "height": "",
+    "city": "اكادير",
+    "category": "ugc _ servisec _ shoting ",
+    "experience": " ",
+    "available": true,
+    "description": "—"
   }
   
 ]
