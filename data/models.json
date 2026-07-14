@@ -1,4 +1,26 @@
 [
+    {
+    "name": "كوتر",
+    "photo": "assets/models/كوتر.png",
+    "age": "",
+    "height": "",
+    "city": "اكادير",
+    "category": "ugc _ servisec _ shoting ",
+    "experience": " ",
+    "available": true,
+    "description": "—"
+  },
+  {
+    "name": "مريم",
+    "photo": "assets/models/maryam hawara.png",
+    "age": "",
+    "height": "",
+    "city": "اكادير",
+    "category": "ugc _ servisec _ shoting ",
+    "experience": " ",
+    "available": true,
+    "description": "—"
+  },
   {
     "name": "دريس",
     "photo": "assets/models/model dris.JPG",
@@ -32,17 +54,7 @@
     "available": true,
     "description": "—"
   },
-  {
-    "name": "مريم",
-    "photo": "assets/models/maryam hawara.png",
-    "age": "",
-    "height": "",
-    "city": "اكادير",
-    "category": "ugc _ servisec _ shoting ",
-    "experience": " ",
-    "available": true,
-    "description": "—"
-  },
+  
   {
     "name": "يوسف",
     "photo": "assets/models/yousef.jpg",
@@ -64,16 +76,6 @@
     "experience": " ",
     "available": true,
     "description": "—"
-  },
-  {
-    "name": "كوتر",
-    "photo": "assets/models/كوتر.png",
-    "age": "",
-    "height": "",
-    "city": "اكادير",
-    "category": "ugc _ servisec _ shoting ",
-    "experience": " ",
-    "available": true,
-    "description": "—"
   }
+
 ]
