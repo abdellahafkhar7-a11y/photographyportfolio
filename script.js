@@ -182,8 +182,14 @@ function applyConfigToStaticPages() {
   }
 }
 
+// Cache for fetched category URLs — avoids duplicate network requests
+// when getSearchIndex() re-reads the same TXT files after loadVideoCategories()
+const categoryUrlCache = {};
+
 // Fetch a TXT file and return an array of validated, deduplicated URLs
 async function fetchCategoryUrls(txtFile) {
+  if (categoryUrlCache[txtFile]) return categoryUrlCache[txtFile];
+
   try {
     const response = await fetch('data/' + txtFile);
     if (!response.ok) return [];
@@ -198,12 +204,13 @@ async function fetchCategoryUrls(txtFile) {
     for (const line of cleaned.split(/\r?\n/)) {
       const url = line.trim();
       if (!url) continue;
-      if (!/^https?:\/\//.test(url)) continue;
+      if (!/^https:\/\//.test(url)) continue;
       if (seen.has(url)) continue;
       seen.add(url);
       urls.push(url);
     }
 
+    categoryUrlCache[txtFile] = urls;
     return urls;
   } catch {
     return [];
@@ -590,6 +597,7 @@ function closeMenu() {
   menuPanel.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
   document.body.style.touchAction = '';
+  document.body.style.overscrollBehavior = '';
 }
 
 if (menuBtn && menuPanel) {
@@ -598,6 +606,7 @@ if (menuBtn && menuPanel) {
     menuPanel.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
+    document.body.style.overscrollBehavior = 'none';
   });
 
   if (menuClose) {
@@ -712,15 +721,7 @@ function navigateTo(pageName) {
 
 function handleRoute() {
   const route = getCurrentRoute();
-  let pageName = ROUTES[route] || 'home';
-
-  // If route is unknown, check if it matches a dynamic category pattern
-  if (pageName === 'home' && route && !route.startsWith('api/')) {
-    // Try matching as a category route — will be resolved after API loads
-    // For now, show home; the real page will be shown once categories are registered
-    pageName = 'home';
-  }
-
+  const pageName = ROUTES[route] || 'home';
   showPage(pageName);
 }
 
@@ -907,7 +908,7 @@ document.addEventListener('click', function(e) {
   msg += '\nشكراً.';
 
   const waUrl = 'https://wa.me/212663493003?text=' + encodeURIComponent(msg);
-  window.open(waUrl, '_blank');
+  window.open(waUrl, '_blank', 'noopener');
 });
 
 // ============================================
@@ -1024,6 +1025,7 @@ const revealCallback = (entries, observer) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
       entry.target.classList.add('active');
+      observer.unobserve(entry.target);
     }
   });
 };
@@ -1180,14 +1182,14 @@ window.addEventListener('load', () => {
   }
 
   function showPlayIcon() {
-    voPlayIcon.style.display = '';
+    voPlayIcon.style.display = 'inline';
     voPauseIcon.style.display = 'none';
     voPlayPauseBtn.setAttribute('aria-label', 'Play');
   }
 
   function showPauseIcon() {
     voPlayIcon.style.display = 'none';
-    voPauseIcon.style.display = '';
+    voPauseIcon.style.display = 'inline';
     voPlayPauseBtn.setAttribute('aria-label', 'Pause');
   }
 
@@ -1315,6 +1317,8 @@ window.addEventListener('load', () => {
     voVolumeSlider.value = 1;
 
     waveformBars = [];
+    canvasWidth = 0;
+    canvasHeight = 0;
     voCtx.clearRect(0, 0, voCanvas.width, voCanvas.height);
 
     voModal.classList.add('active');
@@ -1419,6 +1423,9 @@ window.addEventListener('load', () => {
           audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
 
+        // Safari suspends AudioContext until a user gesture
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
         // slice(0) creates a copy since decodeAudioData may detach the buffer
         const audioBuffer = await decodeAudioData(audioCtx, arrayBuffer.slice(0));
         generateWaveform(audioBuffer);
@@ -1475,19 +1482,30 @@ window.addEventListener('load', () => {
     drawWaveform();
   }
 
-  function drawWaveform() {
+  let canvasWidth = 0;
+  let canvasHeight = 0;
+
+  function resizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
     const rect = voCanvas.getBoundingClientRect();
 
-    if (rect.width === 0) return;
+    if (rect.width === 0) return false;
 
     voCanvas.width = rect.width * dpr;
     voCanvas.height = rect.height * dpr;
     voCtx.setTransform(1, 0, 0, 1, 0, 0);
     voCtx.scale(dpr, dpr);
 
-    const width = rect.width;
-    const height = rect.height;
+    canvasWidth = rect.width;
+    canvasHeight = rect.height;
+    return true;
+  }
+
+  function drawWaveform() {
+    if (canvasWidth === 0) { if (!resizeCanvas()) return; }
+
+    const width = canvasWidth;
+    const height = canvasHeight;
     const barCount = waveformBars.length;
 
     if (barCount === 0) return;
@@ -1723,7 +1741,10 @@ window.addEventListener('load', () => {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (voModal.classList.contains('active')) drawWaveform();
+      if (voModal.classList.contains('active')) {
+        resizeCanvas();
+        drawWaveform();
+      }
     }, 250);
   });
 

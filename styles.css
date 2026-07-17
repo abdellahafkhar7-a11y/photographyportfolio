@@ -1,11 +1,10 @@
-﻿/* ============================================
+/* ============================================
     PREMIUM CINEMATIC DESIGN TOKENS
     Luxury Theme with Purple/Indigo Accents (#6C4DFF / #4F7DFF)
     ============================================ */
 :root {
   /* Color System - Premium Light Palette */
   --bg-primary: #ffffff;
-  --bg-secondary: #F8F7FF;
   --bg-tertiary: #F0F0FA;
   --surface: rgba(255, 255, 255, 0.72);
   --surface-strong: rgba(255, 255, 255, 0.88);
@@ -30,12 +29,10 @@
   
   /* Cinematic Gradients */
   --gradient-cinematic: linear-gradient(135deg, #6C4DFF 0%, #4F7DFF 100%);
-  --gradient-premium: linear-gradient(135deg, #5B3FD6 0%, #6C4DFF 50%, #4F7DFF 100%);
   
   /* Glass System */
   --glass-bg: rgba(255, 255, 255, 0.6);
   --glass-border: rgba(255, 255, 255, 0.5);
-  --glass-shadow: 0 8px 32px rgba(108, 77, 255, 0.08);
   --glass-blur: blur(20px) saturate(180%);
   
   /* Semantic Colors */
@@ -69,7 +66,6 @@
   --radius-full: 9999px;
   
   /* Shadow System - Premium Cinematic */
-  --shadow-xs: 0 1px 2px 0 rgba(108, 77, 255, 0.04);
   --shadow-sm: 0 1px 3px 0 rgba(108, 77, 255, 0.06), 0 1px 2px -1px rgba(108, 77, 255, 0.06);
   --shadow-md: 0 4px 6px -1px rgba(108, 77, 255, 0.08), 0 2px 4px -2px rgba(108, 77, 255, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(108, 77, 255, 0.1), 0 4px 6px -4px rgba(108, 77, 255, 0.08);
@@ -84,8 +80,6 @@
   --text-base: 1rem;      /* 16px */
   --text-lg: 1.125rem;    /* 18px */
   --text-xl: 1.25rem;     /* 20px */
-  --text-2xl: 1.5rem;     /* 24px */
-  --text-3xl: 1.875rem;   /* 30px */
   
   --leading-tight: 1.25;
   --leading-snug: 1.375;
@@ -100,20 +94,17 @@
   
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
   --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   
   /* Z-Index Scale */
   --z-sticky: 200;
-  --z-overlay: 300;
   --z-modal: 400;
   --z-popover: 500;
   --z-tooltip: 600;
   
   /* Layout */
-  --nav-height: 72px;
   --max-width: 1200px;
   --content-max: 1120px;
 }
@@ -133,6 +124,7 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -201,6 +193,14 @@ body::before {
   66% { transform: translate(-20px, 30px) scale(0.95); }
 }
 
+/* Disable animated glows on mobile — filter: blur(80px) is a severe
+   GPU bottleneck on iOS Safari and causes scroll jank */
+@media (max-width: 768px) {
+  .bg-glow {
+    display: none;
+  }
+}
+
 /* ============================================
     TYPOGRAPHY
     ============================================ */
@@ -254,6 +254,10 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+a, button, [role="button"], .reel-card, .vo-card {
+  touch-action: manipulation;
 }
 
 /* ============================================
@@ -632,8 +636,6 @@ footer[id] {
     0 0 0 0 rgba(108, 77, 255, 0.4);
   font-size: var(--text-base);
   letter-spacing: 0.02em;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .button.primary::before {
@@ -1110,8 +1112,7 @@ footer[id] {
 /* Ripple effect for bottom nav clicks */
 @keyframes ripple {
   to {
-    width: 100px;
-    height: 100px;
+    transform: translate(-50%, -50%) scale(5);
     opacity: 0;
   }
 }
@@ -1873,6 +1874,7 @@ footer[id] {
 .modal-open {
   overflow: hidden;
   touch-action: none;
+  overscroll-behavior: none;
 }
 
 /* ============================================
@@ -2706,6 +2708,7 @@ footer[id] {
     max-height: 80dvh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   /* Bottom nav visible on all devices */
@@ -3257,8 +3260,6 @@ footer[id] {
 .bottom-nav-item {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  perspective: 1000px;
-  -webkit-perspective: 1000px;
 }
 
 /* Optimize animations for mobile */
@@ -3757,6 +3758,7 @@ footer[id] {
   -webkit-backdrop-filter: blur(10px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .vo-modal.active {
@@ -3782,6 +3784,7 @@ footer[id] {
   max-height: calc(100dvh - var(--space-10));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   box-shadow: var(--shadow-2xl);
   animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -3999,6 +4002,11 @@ footer[id] {
   transform: scale(1.1);
   box-shadow: 0 8px 25px rgba(108, 77, 255, 0.5);
   background: linear-gradient(135deg, var(--accent-darker), var(--accent-dark), var(--accent-primary));
+}
+
+/* Pause icon hidden by default; shown via JS when audio is playing */
+.vo-icon-pause {
+  display: none;
 }
 
 /* Extra Controls (volume + speed) */
@@ -4396,7 +4404,8 @@ footer[id] {
     background: rgba(255, 255, 255, 0.97);
   }
 
-  .menu-panel {
+  .menu-panel,
+  .nav-menu {
     background: rgba(255, 255, 255, 0.97);
   }
 
