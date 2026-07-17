@@ -221,7 +221,7 @@ function createReelCard(url) {
   const card = document.createElement('article');
   card.className = 'reel-card';
   card.innerHTML =
-    '<video controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="metadata">' +
+    '<video controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="metadata">' +
       '<source data-src="' + url + '" type="video/mp4">' +
     '</video>';
   return card;
@@ -1107,19 +1107,9 @@ function enhanceReelCards() {
     overlay.className = 'reel-overlay';
     overlay.innerHTML =
       '<span class="reel-tag">' + label + '</span>' +
-      '<div class="reel-play-btn">' +
-        '<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
-      '</div>' +
       '<div class="reel-gradient"></div>';
 
     card.appendChild(overlay);
-
-    const video = card.querySelector('video');
-    if (video) {
-      video.addEventListener('play', () => card.classList.add('playing'));
-      video.addEventListener('pause', () => card.classList.remove('playing'));
-      video.addEventListener('ended', () => card.classList.remove('playing'));
-    }
   });
 }
 
@@ -1909,19 +1899,6 @@ window.addEventListener('load', () => {
       if (dx > 0) prev(); else next();
     }
   }, { passive: true });
-
-  // Wire up card clicks — clicking anywhere on the card opens the viewer
-  document.addEventListener('click', e => {
-    const card = e.target.closest('.reel-card');
-    if (!card) return;
-
-    // Only open viewer for cards in the currently active panel
-    const grid = card.closest('.video-grid');
-    if (grid && grid.classList.contains('active')) {
-      e.preventDefault();
-      openViewer(card);
-    }
-  });
 
   // Stop viewer audio when navigating away
   document.addEventListener('click', e => {

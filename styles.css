@@ -1064,7 +1064,6 @@ footer[id] {
 
 /* Loading Skeleton */
 .reel-card.loading {
-  pointer-events: none;
   position: relative;
 }
 
@@ -1086,6 +1085,7 @@ footer[id] {
   z-index: 5;
   border-radius: inherit;
   will-change: background-position;
+  pointer-events: none;
 }
 
 .reel-card.loading::after {
