@@ -58,6 +58,11 @@ function initVideoLoadingHandlers(card, video) {
   setTimeout(() => card.classList.remove('loading'), 5000);
 }
 
+// Disable context menu on all videos (download protection)
+document.addEventListener('contextmenu', e => {
+  if (e.target.tagName === 'VIDEO') e.preventDefault();
+});
+
 // ============================================
 // VIDEO CATEGORIES — TXT File System
 // ============================================
@@ -221,7 +226,7 @@ function createReelCard(url) {
   const card = document.createElement('article');
   card.className = 'reel-card';
   card.innerHTML =
-    '<video controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="metadata">' +
+    '<video controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="metadata" oncontextmenu="return false">' +
       '<source data-src="' + url + '" type="video/mp4">' +
     '</video>';
   return card;
@@ -267,7 +272,6 @@ function renderVideoCards(urls, containerId, slug, limit) {
   grid.innerHTML = '';
   grid.appendChild(fragment);
 
-  enhanceReelCards();
   forceActivateRevealCards(grid);
 }
 
@@ -534,16 +538,7 @@ function renderSearchResults(query) {
   });
 
   grid.appendChild(fragment);
-  enhanceReelCards();
   forceActivateRevealCards(grid);
-
-  // Set correct category tag per card (enhanceReelCards uses grid's data-panel)
-  grid.querySelectorAll('.reel-card').forEach((card, i) => {
-    const tag = card.querySelector('.reel-tag');
-    if (tag) {
-      tag.textContent = categoryLabels[results[i].category] || results[i].category;
-    }
-  });
 }
 
 function initVideoSearch() {
@@ -1083,35 +1078,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Force-activate reveal elements already in viewport (single layout pass)
   forceActivateRevealCards(document);
-
-  // Defer overlay enhancement to idle time
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => enhanceReelCards());
-  } else {
-    setTimeout(() => enhanceReelCards(), 200);
-  }
 });
-
-// ============================================
-// VIDEO CARD OVERLAYS
-// ============================================
-function enhanceReelCards() {
-  document.querySelectorAll('.reel-card').forEach(card => {
-    if (card.querySelector('.reel-overlay')) return;
-
-    const grid = card.closest('.video-grid');
-    const panel = grid ? (grid.dataset.panel || '').replace('-full', '') : '';
-    const label = categoryLabels[panel] || '';
-
-    const overlay = document.createElement('div');
-    overlay.className = 'reel-overlay';
-    overlay.innerHTML =
-      '<span class="reel-tag">' + label + '</span>' +
-      '<div class="reel-gradient"></div>';
-
-    card.appendChild(overlay);
-  });
-}
 
 // Ensure we're at the top after everything loads
 window.addEventListener('load', () => {
