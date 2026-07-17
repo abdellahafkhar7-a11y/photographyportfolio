@@ -855,8 +855,6 @@ footer[id] {
     ============================================ */
 .featured-preview {
   margin-bottom: var(--space-10);
-  content-visibility: auto;
-  contain-intrinsic-size: auto 400px;
   text-align: center;
 }
 
@@ -962,8 +960,6 @@ footer[id] {
 .video-search-results {
   margin-bottom: var(--space-8);
   padding: 0 var(--space-4);
-  content-visibility: auto;
-  contain-intrinsic-size: auto 400px;
 }
 
 .search-results-count {
@@ -1263,8 +1259,6 @@ footer[id] {
     ============================================ */
 .page-view {
   display: none;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 500px;
 }
 
 .page-view.active {
@@ -1278,8 +1272,6 @@ footer[id] {
   width: min(var(--content-max), calc(100% - var(--space-8)));
   margin: var(--space-8) auto;
   padding: var(--space-4) 0;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 600px;
 }
 
 .sub-page-heading {
