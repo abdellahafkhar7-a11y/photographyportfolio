@@ -843,6 +843,18 @@ function showPage(pageName) {
     window.scrollTo(0, 0);
   }
 
+  // Toggle SEO content sections (portfolio/contact unique content)
+  document.querySelectorAll('.seo-content-section').forEach(el => {
+    el.classList.remove('active');
+  });
+  if (pageName === 'home-portfolio') {
+    const seoSection = document.getElementById('portfolio-intro');
+    if (seoSection) seoSection.classList.add('active');
+  } else if (pageName === 'home-contact') {
+    const seoSection = document.getElementById('contact-info');
+    if (seoSection) seoSection.classList.add('active');
+  }
+
   // Trigger reveal observer for newly visible elements
   let revealContainer = targetPage;
   if (!revealContainer && pageName.indexOf('home') === 0) {
