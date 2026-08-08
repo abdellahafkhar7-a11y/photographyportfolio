@@ -97,7 +97,7 @@ let siteConfig = null;
 
 async function loadSiteConfig() {
   try {
-    const response = await fetch('data/config.json');
+    const response = await fetch('/data/config.json');
     if (!response.ok) return;
     siteConfig = await response.json();
   } catch {
@@ -196,7 +196,7 @@ async function fetchCategoryUrls(txtFile) {
   if (categoryUrlCache[txtFile]) return categoryUrlCache[txtFile];
 
   try {
-    const response = await fetch('data/' + txtFile);
+    const response = await fetch('/data/' + txtFile);
     if (!response.ok) return [];
     const text = await response.text();
 
@@ -958,7 +958,7 @@ async function loadModels() {
   if (!grid) return;
 
   try {
-    const response = await fetch('data/models.json');
+    const response = await fetch('/data/models.json');
     const models = await response.json();
 
     grid.innerHTML = '';
@@ -1004,7 +1004,7 @@ async function loadMediaBuyer() {
   if (!grid) return;
 
   try {
-    const response = await fetch('data/media-buyer.json');
+    const response = await fetch('/data/media-buyer.json');
     const campaigns = await response.json();
 
     grid.innerHTML = '';
@@ -1231,7 +1231,7 @@ window.addEventListener('load', () => {
     if (!voGrid) return;
 
     try {
-      const response = await fetch('data/voiceover.json');
+      const response = await fetch('/data/voiceover.json');
       const items = await response.json();
 
       voGrid.innerHTML = '';
