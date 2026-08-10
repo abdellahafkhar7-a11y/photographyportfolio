@@ -54,6 +54,24 @@ function initVideoLoadingHandlers(card, video) {
   video.addEventListener('waiting', () => card.classList.add('loading'));
   video.addEventListener('playing', () => card.classList.remove('loading'));
 
+  // Single-active playback: iOS Safari allows only one video to actively
+  // decode at a time. When this video starts, pause every other reel-card
+  // video so the next one can acquire the media-engine slot. Without this,
+  // tapping Video 2 while Video 1 is still playing is silently rejected.
+  video.addEventListener('play', () => {
+    document.querySelectorAll('.reel-card video').forEach(v => {
+      if (v !== video && !v.paused) v.pause();
+    });
+  });
+
+  // Temporary on-device diagnostic (remove after verifying the fix).
+  // Logs the exact MediaError code so the iOS failure can be confirmed.
+  video.addEventListener('error', () => {
+    var s = card.querySelector('source');
+    console.warn('[video] error', video.error ? video.error.code : null,
+      video.currentSrc || (s && s.dataset.src));
+  });
+
   // Fallback: remove loading state after 5s (iOS)
   setTimeout(() => card.classList.remove('loading'), 5000);
 }
@@ -226,24 +244,40 @@ function createReelCard(url) {
   const card = document.createElement('article');
   card.className = 'reel-card';
   card.innerHTML =
-    '<video controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="metadata" oncontextmenu="return false">' +
+    '<video controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="none" oncontextmenu="return false">' +
       '<source data-src="' + url + '" type="video/mp4">' +
-    '</video>';
+    '</video>' +
+    '<div class="reel-spinner" aria-hidden="true"></div>';
   return card;
 }
 
-// Lazy-load video sources via IntersectionObserver
+// Lazy-load video sources via IntersectionObserver.
+// On enter: set source.src + upgrade preload to "auto" + video.load().
+//   The browser then uses native HTTP Range requests to fetch the moov
+//   atom (metadata) and buffer initial video data — it does NOT download
+//   the entire MP4 before allowing playback.
+// On exit: just video.pause(). No src removal, no load(), no DOM mutations.
+//   This keeps the video ready for instant playback if the user scrolls
+//   back, and avoids blocking the main thread during scroll.
 const lazyVideoObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
+    const card = entry.target;
+    const video = card.querySelector('video');
+    const source = card.querySelector('source');
+    if (!video || !source) return;
+
     if (entry.isIntersecting) {
-      const source = entry.target.querySelector('source');
-      if (source && source.dataset.src) {
-        const video = entry.target.querySelector('video');
+      // Enter viewport: assign src + upgrade preload so the browser
+      // proactively buffers via Range requests.
+      if (source.dataset.src && !source.src) {
         source.src = source.dataset.src;
         source.removeAttribute('data-src');
-        if (video) video.load();
+        video.preload = 'auto';
+        video.load();
       }
-      lazyVideoObserver.unobserve(entry.target);
+    } else {
+      // Leave viewport: pause only. Keep src so scrolling back is instant.
+      video.pause();
     }
   });
 }, { rootMargin: '300px 0px', threshold: 0.01 });
@@ -1932,4 +1966,102 @@ window.addEventListener('load', () => {
   });
 
   imgObserver.observe(document.body, { childList: true, subtree: true });
+})();
+
+// ============================================
+// PATTERN WATERMARK — Repeating diagonal "Photography Pixel" text overlay
+// Additional video protection layer. Does NOT replace existing protection.
+// ============================================
+(function() {
+  'use strict';
+
+  // SVG tile: two rows of "Photography Pixel" offset for diagonal effect.
+  // Combined with CSS rotation on the overlay, creates a dense diagonal pattern.
+  var SVG_TILE = '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="80">' +
+    '<text x="10" y="28" fill="white" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="bold">Photography Pixel</text>' +
+    '<text x="150" y="68" fill="white" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="bold">Photography Pixel</text>' +
+    '</svg>';
+
+  var BG_IMAGE = 'url("data:image/svg+xml,' + encodeURIComponent(SVG_TILE) + '")';
+  var CONTAINER_SELECTOR = '.reel-card, .cv-video-wrapper';
+  var WATERMARK_CLASS = 'pp-pattern-watermark';
+
+  // -- Create watermark overlay if missing in container --
+  function ensureWatermark(container) {
+    if (!container || !container.querySelector) return;
+    if (container.querySelector('.' + WATERMARK_CLASS)) return;
+    var overlay = document.createElement('div');
+    overlay.className = WATERMARK_CLASS;
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.style.backgroundImage = BG_IMAGE;
+    container.appendChild(overlay);
+  }
+
+  // -- Apply watermarks to all video containers --
+  function applyWatermarks(root) {
+    (root || document).querySelectorAll(CONTAINER_SELECTOR).forEach(ensureWatermark);
+  }
+
+  // -- Anti-removal & dynamic container detection --
+  var domObserver = new MutationObserver(function(mutations) {
+    for (var i = 0; i < mutations.length; i++) {
+      var m = mutations[i];
+      var j, node;
+
+      // Recreate watermarks that were removed from the DOM
+      for (j = 0; j < m.removedNodes.length; j++) {
+        node = m.removedNodes[j];
+        if (node.nodeType !== 1) continue;
+        if (node.classList && node.classList.contains(WATERMARK_CLASS)) {
+          ensureWatermark(m.target);
+        }
+        if (node.querySelectorAll) applyWatermarks(node);
+      }
+
+      // Add watermarks to new video containers
+      for (j = 0; j < m.addedNodes.length; j++) {
+        node = m.addedNodes[j];
+        if (node.nodeType !== 1) continue;
+        if (node.matches && node.matches(CONTAINER_SELECTOR)) ensureWatermark(node);
+        if (node.querySelectorAll) {
+          applyWatermarks(node);
+        }
+      }
+    }
+  });
+
+  // -- Dynamic behavior: subtle changes every 8-12 seconds --
+  var dynamicTimer = null;
+  function startDynamicBehavior() {
+    function update() {
+      var overlays = document.querySelectorAll('.' + WATERMARK_CLASS);
+      if (overlays.length) {
+        var opacity = (0.08 + Math.random() * 0.07).toFixed(3);
+        var rotation = (-30 + Math.random() * 10).toFixed(1);
+        var posX = Math.round(Math.random() * 30 - 15) + 'px';
+        var posY = Math.round(Math.random() * 30 - 15) + 'px';
+        for (var i = 0; i < overlays.length; i++) {
+          overlays[i].style.setProperty('--pp-wm-opacity', opacity);
+          overlays[i].style.setProperty('--pp-wm-rotation', rotation + 'deg');
+          overlays[i].style.setProperty('--pp-wm-x', posX);
+          overlays[i].style.setProperty('--pp-wm-y', posY);
+        }
+      }
+      dynamicTimer = setTimeout(update, 8000 + Math.random() * 4000);
+    }
+    update();
+  }
+
+  // -- Initialize --
+  function init() {
+    applyWatermarks();
+    startDynamicBehavior();
+    domObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
