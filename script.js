@@ -39,31 +39,32 @@ function debounce(func, wait) {
   };
 }
 
-// Disable context menu on videos and images (basic download protection)
-document.addEventListener('contextmenu', e => {
-  if (e.target.tagName === 'VIDEO' || e.target.tagName === 'IMG' || e.target.closest('.reel-card')) {
-    e.preventDefault();
-  }
-});
-
-// Basic dev-tools / view-source shortcut deterrence (does not provide real security)
-document.addEventListener('keydown', e => {
-  // F12
-  if (e.key === 'F12') {
-    e.preventDefault();
-    return;
-  }
-  // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C (dev tools)
-  if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
-    e.preventDefault();
-    return;
-  }
-  // Ctrl+U (view source)
-  if (e.ctrlKey && !e.shiftKey && (e.key === 'U' || e.key === 'u')) {
-    e.preventDefault();
-    return;
-  }
-});
+// TEMPORARILY DISABLED for debugging — restore after diagnostic
+// // Disable context menu on videos and images (basic download protection)
+// document.addEventListener('contextmenu', e => {
+//   if (e.target.tagName === 'VIDEO' || e.target.tagName === 'IMG' || e.target.closest('.reel-card')) {
+//     e.preventDefault();
+//   }
+// });
+//
+// // Basic dev-tools / view-source shortcut deterrence (does not provide real security)
+// document.addEventListener('keydown', e => {
+//   // F12
+//   if (e.key === 'F12') {
+//     e.preventDefault();
+//     return;
+//   }
+//   // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C (dev tools)
+//   if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
+//     e.preventDefault();
+//     return;
+//   }
+//   // Ctrl+U (view source)
+//   if (e.ctrlKey && !e.shiftKey && (e.key === 'U' || e.key === 'u')) {
+//     e.preventDefault();
+//     return;
+//   }
+// });
 
 // ============================================
 // VIDEO CATEGORIES — TXT File System
