@@ -39,46 +39,30 @@ function debounce(func, wait) {
   };
 }
 
-function pauseAllVideos() {
-  document.querySelectorAll('video').forEach(video => video.pause());
-}
-
-// Attach loading-state event handlers to a reel card's video element
-function initVideoLoadingHandlers(card, video) {
-  if (!card || !video) return;
-
-  video.addEventListener('loadstart', () => card.classList.add('loading'));
-  video.addEventListener('loadedmetadata', () => card.classList.remove('loading'));
-  video.addEventListener('loadeddata', () => card.classList.remove('loading'));
-  video.addEventListener('canplay', () => card.classList.remove('loading'));
-  video.addEventListener('waiting', () => card.classList.add('loading'));
-  video.addEventListener('playing', () => card.classList.remove('loading'));
-
-  // Single-active playback: iOS Safari allows only one video to actively
-  // decode at a time. When this video starts, pause every other reel-card
-  // video so the next one can acquire the media-engine slot. Without this,
-  // tapping Video 2 while Video 1 is still playing is silently rejected.
-  video.addEventListener('play', () => {
-    document.querySelectorAll('.reel-card video').forEach(v => {
-      if (v !== video && !v.paused) v.pause();
-    });
-  });
-
-  // Temporary on-device diagnostic (remove after verifying the fix).
-  // Logs the exact MediaError code so the iOS failure can be confirmed.
-  video.addEventListener('error', () => {
-    var s = card.querySelector('source');
-    console.warn('[video] error', video.error ? video.error.code : null,
-      video.currentSrc || (s && s.dataset.src));
-  });
-
-  // Fallback: remove loading state after 5s (iOS)
-  setTimeout(() => card.classList.remove('loading'), 5000);
-}
-
-// Disable context menu on all videos (download protection)
+// Disable context menu on videos and images (basic download protection)
 document.addEventListener('contextmenu', e => {
-  if (e.target.tagName === 'VIDEO') e.preventDefault();
+  if (e.target.tagName === 'VIDEO' || e.target.tagName === 'IMG' || e.target.closest('.reel-card')) {
+    e.preventDefault();
+  }
+});
+
+// Basic dev-tools / view-source shortcut deterrence (does not provide real security)
+document.addEventListener('keydown', e => {
+  // F12
+  if (e.key === 'F12') {
+    e.preventDefault();
+    return;
+  }
+  // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C (dev tools)
+  if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
+    e.preventDefault();
+    return;
+  }
+  // Ctrl+U (view source)
+  if (e.ctrlKey && !e.shiftKey && (e.key === 'U' || e.key === 'u')) {
+    e.preventDefault();
+    return;
+  }
 });
 
 // ============================================
@@ -94,10 +78,6 @@ const CATEGORIES = [
   { slug: 'gallery',  label: 'Gallery',   txt: 'gallery.txt',  route: 'gallery',     icon: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>', expanded: true },
   { slug: 'drone',    label: 'Locations', txt: 'drone.txt',     route: 'drone',       icon: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle>' }
 ];
-
-// Build categoryLabels from CATEGORIES
-const categoryLabels = {};
-CATEGORIES.forEach(c => { categoryLabels[c.slug] = c.label; });
 
 // Static nav items rendered in the expanded section (no TXT data files)
 const EXPANDED_NAV_ITEMS = [
@@ -209,9 +189,35 @@ function applyConfigToStaticPages() {
 // when getSearchIndex() re-reads the same TXT files after loadVideoCategories()
 const categoryUrlCache = {};
 
+// Set of unavailable Bamboo video IDs (loaded from data/video-status.json)
+let unavailableVideoIds = null;
+
+async function loadVideoStatus() {
+  if (unavailableVideoIds !== null) return;
+  unavailableVideoIds = new Set();
+  try {
+    const response = await fetch('/data/video-status.json');
+    if (!response.ok) return;
+    const data = await response.json();
+    if (Array.isArray(data.unavailable)) {
+      data.unavailable.forEach(id => unavailableVideoIds.add(id));
+    }
+  } catch {
+    // If file missing or invalid, treat all videos as available
+  }
+}
+
+// Extract Bamboo video ID from an embed URL
+function getBambooVideoId(url) {
+  var match = url.match(/[?&]id=([^&]+)/);
+  return match ? match[1] : null;
+}
+
 // Fetch a TXT file and return an array of validated, deduplicated URLs
 async function fetchCategoryUrls(txtFile) {
   if (categoryUrlCache[txtFile]) return categoryUrlCache[txtFile];
+
+  await loadVideoStatus();
 
   try {
     const response = await fetch('/data/' + txtFile);
@@ -229,6 +235,11 @@ async function fetchCategoryUrls(txtFile) {
       if (!url) continue;
       if (!/^https:\/\//.test(url)) continue;
       if (seen.has(url)) continue;
+
+      // Filter out unavailable/processing videos
+      var videoId = getBambooVideoId(url);
+      if (videoId && unavailableVideoIds.has(videoId)) continue;
+
       seen.add(url);
       urls.push(url);
     }
@@ -240,47 +251,66 @@ async function fetchCategoryUrls(txtFile) {
   }
 }
 
-function createReelCard(url) {
-  const card = document.createElement('article');
-  card.className = 'reel-card';
-  card.innerHTML =
-    '<video controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsinline webkit-playsinline preload="none" oncontextmenu="return false">' +
-      '<source data-src="' + url + '" type="video/mp4">' +
-    '</video>' +
-    '<div class="reel-spinner" aria-hidden="true"></div>';
-  return card;
+// ============================================
+// DETERMINISTIC HOURLY SHUFFLE (UGC only)
+// Reorders an array based on the current clock hour so that:
+// - The order is stable during the same hour (refresh = same order).
+// - The order changes when the hour changes.
+// - All visitors during the same hour see the same order.
+// - No video is duplicated or lost — every item appears exactly once.
+// ============================================
+function hourlyShuffle(array) {
+  var now = new Date();
+  var seed = now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0') + '-' +
+    String(now.getHours()).padStart(2, '0');
+
+  // Convert seed string to a 32-bit integer hash
+  var hash = 0;
+  for (var i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash = hash & hash;
+  }
+
+  // Mulberry32 — fast deterministic PRNG
+  function mulberry32(a) {
+    return function() {
+      a |= 0;
+      a = (a + 0x6D2B79F5) | 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  var rng = mulberry32(hash);
+  var result = array.slice();
+
+  // Fisher-Yates shuffle
+  for (var j = result.length - 1; j > 0; j--) {
+    var k = Math.floor(rng() * (j + 1));
+    var temp = result[j];
+    result[j] = result[k];
+    result[k] = temp;
+  }
+
+  return result;
 }
 
-// Lazy-load video sources via IntersectionObserver.
-// On enter: set source.src + upgrade preload to "auto" + video.load().
-//   The browser then uses native HTTP Range requests to fetch the moov
-//   atom (metadata) and buffer initial video data — it does NOT download
-//   the entire MP4 before allowing playback.
-// On exit: just video.pause(). No src removal, no load(), no DOM mutations.
-//   This keeps the video ready for instant playback if the user scrolls
-//   back, and avoids blocking the main thread during scroll.
-const lazyVideoObserver = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    const card = entry.target;
-    const video = card.querySelector('video');
-    const source = card.querySelector('source');
-    if (!video || !source) return;
-
-    if (entry.isIntersecting) {
-      // Enter viewport: assign src + upgrade preload so the browser
-      // proactively buffers via Range requests.
-      if (source.dataset.src && !source.src) {
-        source.src = source.dataset.src;
-        source.removeAttribute('data-src');
-        video.preload = 'auto';
-        video.load();
-      }
-    } else {
-      // Leave viewport: pause only. Keep src so scrolling back is instant.
-      video.pause();
-    }
-  });
-}, { rootMargin: '300px 0px', threshold: 0.01 });
+function createBambooCard(url) {
+  var card = document.createElement('article');
+  card.className = 'reel-card';
+  card.innerHTML =
+    '<div style="width:100%;aspect-ratio:9/16;position:relative;z-index:1;background:#000;overflow:hidden;border-radius:inherit;">' +
+      '<iframe src="' + url + '" ' +
+        'style="position:absolute;left:0;top:0;width:100%;height:100%;border:0;" ' +
+        'frameborder="0" allow="autoplay; encrypted-media" loading="lazy"></iframe>' +
+      '<div class="reel-card-fullscreen-guard" aria-hidden="true"></div>' +
+    '</div>';
+  return card;
+}
 
 function renderVideoCards(urls, containerId, slug, limit) {
   const grid = document.getElementById(containerId);
@@ -290,12 +320,8 @@ function renderVideoCards(urls, containerId, slug, limit) {
   const fragment = document.createDocumentFragment();
 
   list.forEach(url => {
-    const card = createReelCard(url);
+    const card = createBambooCard(url);
     fragment.appendChild(card);
-
-    const video = card.querySelector('video');
-    initVideoLoadingHandlers(card, video);
-    lazyVideoObserver.observe(card);
 
     card.classList.add('reveal-scale');
     const delay = Math.min(Math.floor(fragment.children.length / 3), 5);
@@ -440,8 +466,11 @@ async function loadVideoCategories() {
       return;
     }
 
-    renderVideoCards(urls, 'home-grid-' + cat.slug, cat.slug, 3);
-    renderVideoCards(urls, 'grid-cat-' + cat.slug, cat.slug);
+    // Deterministic hourly shuffle — UGC only
+    var displayUrls = cat.slug === 'ugc' ? hourlyShuffle(urls) : urls;
+
+    renderVideoCards(displayUrls, 'home-grid-' + cat.slug, cat.slug, 3);
+    renderVideoCards(displayUrls, 'grid-cat-' + cat.slug, cat.slug);
   }));
 }
 
@@ -558,12 +587,8 @@ function renderSearchResults(query) {
   const fragment = document.createDocumentFragment();
 
   results.forEach(item => {
-    const card = createReelCard(item.video);
+    const card = createBambooCard(item.video);
     fragment.appendChild(card);
-
-    const video = card.querySelector('video');
-    initVideoLoadingHandlers(card, video);
-    lazyVideoObserver.observe(card);
 
     card.classList.add('reveal-scale');
     const delay = Math.min(Math.floor(fragment.children.length / 3), 5);
@@ -826,8 +851,6 @@ function setMetaContent(selector, content) {
 // SPA PAGE NAVIGATION SYSTEM
 // ============================================
 function showPage(pageName) {
-  pauseAllVideos();
-
   updatePageMeta(pageName);
 
   // Re-query page views to include dynamically created pages
@@ -1782,144 +1805,6 @@ window.addEventListener('load', () => {
 
   // Initialize
   document.addEventListener('DOMContentLoaded', loadVoiceOvers);
-})();
-
-// ============================================
-// CINEMATIC FULLSCREEN VIEWER
-// ============================================
-(function() {
-  'use strict';
-
-  const viewer = document.getElementById('cinematic-viewer');
-  if (!viewer) return;
-
-  const backdrop = viewer.querySelector('.cv-backdrop');
-  const closeBtn = viewer.querySelector('.cv-close');
-  const prevBtn = viewer.querySelector('.cv-prev');
-  const nextBtn = viewer.querySelector('.cv-next');
-  const videoEl = viewer.querySelector('video');
-  const tagEl = viewer.querySelector('.cv-tag');
-  const titleEl = viewer.querySelector('.cv-title');
-  const durationEl = viewer.querySelector('.cv-duration');
-
-  let videoList = [];
-  let currentIndex = 0;
-  let lastFocused = null;
-  let touchStartX = 0;
-
-  function collectVideos() {
-    videoList = [];
-    document.querySelectorAll('.reel-card').forEach(card => {
-      const source = card.querySelector('video source');
-      const src = source && (source.src || source.dataset.src);
-      if (src) {
-        const grid = card.closest('.video-grid');
-        const panel = grid ? grid.dataset.panel : '';
-        videoList.push({
-          src: src,
-          category: categoryLabels[panel] || '',
-          title: panel ? (panel.charAt(0).toUpperCase() + panel.slice(1)) : 'Project',
-          card: card
-        });
-      }
-    });
-  }
-
-  function openViewer(card) {
-    collectVideos();
-    if (videoList.length === 0) return;
-
-    const found = videoList.findIndex(item => item.card === card);
-    currentIndex = found >= 0 ? found : 0;
-
-    lastFocused = card;
-    loadVideo(currentIndex);
-    viewer.classList.add('active');
-    viewer.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('modal-open');
-    document.body.style.overflow = 'hidden';
-
-    setTimeout(() => { videoEl.play().catch(() => {}); }, 300);
-  }
-
-  function loadVideo(index) {
-    if (index < 0) index = videoList.length - 1;
-    if (index >= videoList.length) index = 0;
-
-    currentIndex = index;
-    const item = videoList[index];
-
-    videoEl.src = item.src;
-    tagEl.textContent = item.category;
-    titleEl.textContent = item.title;
-    durationEl.textContent = '';
-
-    videoEl.addEventListener('loadedmetadata', function setDur() {
-      const m = Math.floor(videoEl.duration / 60);
-      const s = Math.floor(videoEl.duration % 60);
-      durationEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-      videoEl.removeEventListener('loadedmetadata', setDur);
-    });
-  }
-
-  function closeViewer() {
-    viewer.classList.remove('active');
-    viewer.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('modal-open');
-    document.body.style.overflow = '';
-    videoEl.pause();
-    videoEl.removeAttribute('src');
-    videoEl.load();
-
-    if (lastFocused) lastFocused.focus();
-  }
-
-  function next() {
-    loadVideo(currentIndex + 1);
-    setTimeout(() => { videoEl.play().catch(() => {}); }, 200);
-  }
-
-  function prev() {
-    loadVideo(currentIndex - 1);
-    setTimeout(() => { videoEl.play().catch(() => {}); }, 200);
-  }
-
-  // Close
-  closeBtn.addEventListener('click', closeViewer);
-  backdrop.addEventListener('click', closeViewer);
-
-  // Navigation
-  prevBtn.addEventListener('click', prev);
-  nextBtn.addEventListener('click', next);
-
-  // Keyboard
-  viewer.addEventListener('keydown', e => {
-    switch (e.key) {
-      case 'Escape': e.preventDefault(); closeViewer(); break;
-      case 'ArrowLeft': e.preventDefault(); prev(); break;
-      case 'ArrowRight': e.preventDefault(); next(); break;
-    }
-  });
-
-  // Touch swipe
-  viewer.addEventListener('touchstart', e => {
-    touchStartX = e.touches[0].clientX;
-  }, { passive: true });
-
-  viewer.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    if (Math.abs(dx) > 60) {
-      if (dx > 0) prev(); else next();
-    }
-  }, { passive: true });
-
-  // Stop viewer audio when navigating away
-  document.addEventListener('click', e => {
-    const navItem = e.target.closest('[data-nav]');
-    if (navItem && viewer.classList.contains('active')) {
-      closeViewer();
-    }
-  }, true);
 })();
 
 // ============================================
