@@ -12,3 +12,4 @@ https://cdn.bamboo-cloud.com/api/embed?id=0_9i7s9vdy&uiconf_id=11688057&type=ent
 https://cdn.bamboo-cloud.com/api/embed?id=0_0kd1fxo8&uiconf_id=11688057&type=entry&iid=6a7a24a106304449837d1733&newPlayer=true
 https://cdn.bamboo-cloud.com/api/embed?id=0_9ozzbdyo&uiconf_id=11688057&type=entry&iid=6a7a24a106304449837d1733&newPlayer=true
 https://cdn.bamboo-cloud.com/api/embed?id=0_macvg0lf&uiconf_id=11688057&type=entry&iid=6a7a24a106304449837d1733&newPlayer=true
+https://cdn.bamboo-cloud.com/api/embed?id=0_y359x4ot&uiconf_id=11688057&type=entry&iid=6a7a24a106304449837d1733&newPlayer=true
